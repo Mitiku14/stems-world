@@ -1,0 +1,27 @@
+# ─── Environment variables ────────────────────────────────
+# NEVER commit .env — it contains real credentials
+.env
+.env.*
+!.env.example
+
+# ─── Dependencies ─────────────────────────────────────────
+node_modules/
+
+# ─── Uploads ──────────────────────────────────────────────
+# Uploaded PDFs are transient — not tracked in git
+src/uploads/*
+!src/uploads/.gitkeep
+
+# ─── Logs ─────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── OS files ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Editor files ─────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
