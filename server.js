@@ -32,8 +32,24 @@ app.use((req, res, next) => {
   return helmet(helmetOptions)(req, res, next);
 });
 
+// CORS — allowed origins:
+// • CLIENT_URL from .env (your frontend)
+// • The API's own URL (allows Swagger UI "Try it out" to work on the deployed server)
+// • localhost:3000 always included for local development
+const allowedOrigins = [
+  env.clientUrl,
+  process.env.API_URL,
+  'http://localhost:3000',
+  'http://localhost:5173', // Vite dev server (if used)
+].filter(Boolean); // remove undefined entries
+
 app.use(cors({
-  origin: env.clientUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (Postman, mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin '${origin}' is not allowed.`));
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
