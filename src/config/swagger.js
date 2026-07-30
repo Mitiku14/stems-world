@@ -1,5 +1,9 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
+// In development the server is localhost.
+// On Render, set API_URL=https://your-app.onrender.com in the environment variables.
+const serverUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -41,12 +45,8 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     },
     servers: [
       {
-        url: 'http://localhost:5000',
-        description: 'Development server',
-      },
-      {
-        url: 'https://your-app.onrender.com',
-        description: 'Production server (Render)',
+        url: serverUrl,
+        description: process.env.NODE_ENV === 'production' ? 'Production server (Render)' : 'Development server',
       },
     ],
     components: {
