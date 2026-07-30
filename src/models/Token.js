@@ -9,8 +9,7 @@ const tokenSchema = new mongoose.Schema(
       required: true,
     },
 
-    // We store a SHA-256 hash of the token — the raw token only lives in the email link.
-    // This way a compromised DB cannot be used to hijack accounts.
+    // SHA-256 hash of the raw token — raw token lives only in the email link
     token: {
       type: String,
       required: true,
@@ -27,19 +26,12 @@ const tokenSchema = new mongoose.Schema(
       required: true,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// MongoDB TTL index — automatically deletes expired token documents from the collection.
-// The background job runs approximately every 60 seconds.
+// TTL index — MongoDB automatically removes expired documents (~60s precision)
 tokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-// Fast lookup by token hash
 tokenSchema.index({ token: 1 });
-
-// Fast lookup to find all tokens for a user (e.g., delete old ones on re-send)
 tokenSchema.index({ userId: 1, type: 1 });
 
 module.exports = mongoose.model('Token', tokenSchema);

@@ -41,19 +41,15 @@ const courseSchema = new mongoose.Schema(
       default: true,
     },
 
-    // Track which admin created this course
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       default: null,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Text index for search on title and description
 courseSchema.index({ title: 'text', description: 'text' });
 courseSchema.index({ isActive: 1 });
 courseSchema.index({ category: 1 });

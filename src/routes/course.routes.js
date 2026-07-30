@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const courseController = require('../controllers/courseController');
+const courseController = require('../controllers/course.controller');
 const courseValidator = require('../validators/course.validator');
 const { validate } = require('../middleware/validate.middleware');
 const { verifyToken } = require('../middleware/auth.middleware');
