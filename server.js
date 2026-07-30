@@ -39,8 +39,9 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   env.clientUrl,
   process.env.API_URL,
+  'https://stem-frontend-delta.vercel.app', // production frontend on Vercel
   'http://localhost:3000',
-  'http://localhost:5173', // Vite dev server (if used)
+  'http://localhost:5173',
 ].filter(Boolean); // remove undefined entries
 
 app.use(cors({
