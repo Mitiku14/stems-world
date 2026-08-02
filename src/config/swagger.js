@@ -160,39 +160,21 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
         // ── Enrollment ─────────────────────────────────────────────────────
         Enrollment: {
           type: 'object',
+          description: 'Flattened enrollment shape returned to the admin frontend.',
           properties: {
-            _id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
-            student: { $ref: '#/components/schemas/User' },
-            course: { $ref: '#/components/schemas/Course' },
+            id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            studentName: { type: 'string', example: 'John Doe' },
+            email: { type: 'string', example: 'john@example.com' },
+            courseType: { type: 'string', example: 'Introduction to Machine Learning' },
+            academicFileName: { type: 'string', nullable: true, example: 'a1b2c3d4.pdf' },
             status: {
               type: 'string',
-              enum: ['pending', 'approved', 'rejected'],
+              enum: ['pending', 'accepted', 'rejected'],
               example: 'pending',
             },
-            academicPdf: {
-              type: 'string',
-              example: 'a1b2c3d4-uuid.pdf',
-              nullable: true,
-              description: 'Filename of uploaded PDF (if required)',
-            },
-            rejectionReason: {
-              type: 'string',
-              example: 'Submitted documents are incomplete.',
-              nullable: true,
-            },
-            reviewedBy: {
-              type: 'string',
-              example: '64a1b2c3d4e5f6789012abcd',
-              nullable: true,
-              description: 'Admin user ID who reviewed this enrollment',
-            },
-            reviewedAt: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
-              example: '2024-01-20T14:00:00.000Z',
-            },
-            createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+            registeredAt: { type: 'string', format: 'date-time' },
+            rejectionReason: { type: 'string', nullable: true },
+            reviewedAt: { type: 'string', format: 'date-time', nullable: true },
           },
         },
 
@@ -200,15 +182,15 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
         DashboardStats: {
           type: 'object',
           properties: {
-            totalStudents: { type: 'integer', example: 150 },
-            totalCourses: { type: 'integer', example: 6 },
+            totalStudents: { type: 'integer', example: 42 },
+            totalCourses:  { type: 'integer', example: 6 },
             enrollments: {
               type: 'object',
               properties: {
-                total: { type: 'integer', example: 320 },
-                pending: { type: 'integer', example: 45 },
-                approved: { type: 'integer', example: 250 },
-                rejected: { type: 'integer', example: 25 },
+                total:    { type: 'integer', example: 100 },
+                pending:  { type: 'integer', example: 20 },
+                accepted: { type: 'integer', example: 70 },
+                rejected: { type: 'integer', example: 10 },
               },
             },
           },
@@ -295,12 +277,13 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     },
 
     tags: [
-      { name: 'Auth', description: 'Registration, login, email verification, password management' },
-      { name: 'Courses', description: 'Browse and manage courses' },
-      { name: 'Enrollments', description: 'Student enrollment submission and status tracking' },
-      { name: 'Admin — Dashboard', description: 'Admin overview statistics' },
-      { name: 'Admin — Enrollments', description: 'Admin enrollment review and approval workflow' },
-      { name: 'Admin — Students', description: 'Admin student account management' },
+      { name: 'Auth',                description: 'Registration, login, email verification, password management' },
+      { name: 'Courses',             description: 'Browse and manage courses' },
+      { name: 'Enrollments',         description: 'Student enrollment submission and status tracking' },
+      { name: 'Contact',             description: 'Public contact / feedback form' },
+      { name: 'Admin — Dashboard',   description: 'Admin overview statistics and feedback' },
+      { name: 'Admin — Enrollments', description: 'Admin enrollment review (accept / reject)' },
+      { name: 'Admin — Students',    description: 'Admin student account management' },
     ],
   },
 
@@ -310,6 +293,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     './src/routes/course.routes.js',
     './src/routes/enrollment.routes.js',
     './src/routes/admin.routes.js',
+    './src/routes/contact.routes.js',
   ],
 };
 

@@ -3,10 +3,25 @@ const { ENROLLMENT_STATUS } = require('../constants');
 
 const enrollmentSchema = new mongoose.Schema(
   {
+    // For authenticated enrollments: set from JWT
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
+    },
+
+    // For anonymous enrollments: stored directly from form fields
+    studentName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    studentEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
     },
 
     course: {
@@ -47,6 +62,7 @@ const enrollmentSchema = new mongoose.Schema(
 );
 
 enrollmentSchema.index({ student: 1, course: 1, status: 1 });
+enrollmentSchema.index({ studentEmail: 1, course: 1, status: 1 });
 enrollmentSchema.index({ status: 1, createdAt: -1 });
 enrollmentSchema.index({ student: 1, course: 1 });
 

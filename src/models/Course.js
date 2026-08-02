@@ -41,6 +41,15 @@ const courseSchema = new mongoose.Schema(
       default: true,
     },
 
+    // Stable string key used by the frontend (e.g. "cs-1", "math-3").
+    // Allows enrollment lookup without knowing the MongoDB ObjectId.
+    frontendId: {
+      type: String,
+      default: null,
+      sparse: true,
+      unique: true,
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -53,5 +62,6 @@ const courseSchema = new mongoose.Schema(
 courseSchema.index({ title: 'text', description: 'text' });
 courseSchema.index({ isActive: 1 });
 courseSchema.index({ category: 1 });
+// frontendId index is handled by the field-level sparse:true + unique:true above
 
 module.exports = mongoose.model('Course', courseSchema);

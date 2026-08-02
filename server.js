@@ -19,6 +19,7 @@ const authRoutes       = require('./src/routes/auth.routes');
 const courseRoutes     = require('./src/routes/course.routes');
 const enrollmentRoutes = require('./src/routes/enrollment.routes');
 const adminRoutes      = require('./src/routes/admin.routes');
+const contactRoutes    = require('./src/routes/contact.routes');
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use('/api/auth',        authRoutes);
 app.use('/api/courses',     courseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/admin',       adminRoutes);
+app.use('/api/contact',     contactRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Route not found.' });

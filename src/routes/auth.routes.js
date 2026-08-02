@@ -17,8 +17,9 @@ const { verifyToken } = require('../middleware/auth.middleware');
  *     summary: Register a new student account
  *     description: >
  *       Creates a new local student account and sends a verification email.
- *       **No JWT is returned at this step.** The student must verify their email
- *       before they can log in.
+ *       **No JWT is returned at this step.**
+ *       Frontend sends: `{ fullName, email, password }`.
+ *       Username is auto-generated from fullName.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -26,18 +27,10 @@ const { verifyToken } = require('../middleware/auth.middleware');
  *         application/json:
  *           schema:
  *             type: object
- *             required: [username, name, email, password]
+ *             required: [fullName, email, password]
  *             properties:
- *               username:
+ *               fullName:
  *                 type: string
- *                 minLength: 4
- *                 maxLength: 30
- *                 pattern: '^[a-zA-Z0-9_]+$'
- *                 example: john_doe
- *                 description: Unique username (letters, numbers, underscores only)
- *               name:
- *                 type: string
- *                 maxLength: 100
  *                 example: John Doe
  *               email:
  *                 type: string
@@ -45,33 +38,15 @@ const { verifyToken } = require('../middleware/auth.middleware');
  *                 example: john@example.com
  *               password:
  *                 type: string
- *                 minLength: 8
- *                 example: Secret@123
- *                 description: Must contain at least one uppercase, one lowercase, one number
- *               phone:
- *                 type: string
- *                 example: '+1234567890'
- *                 description: Optional phone number
+ *                 minLength: 6
+ *                 example: secret123
  *     responses:
  *       201:
  *         description: Registration successful — verification email sent
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Registration successful. Please check your email to verify your account.' }
  *       409:
- *         description: Email or username already exists
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *             example: { success: false, message: 'An account with that email or username already exists.' }
+ *         description: Email already exists
  *       422:
  *         $ref: '#/components/responses/ValidationError'
- *       500:
- *         $ref: '#/components/responses/ServerError'
  */
 router.post('/register', authValidator.register, validate, authController.register);
 
@@ -80,36 +55,17 @@ router.post('/register', authValidator.register, validate, authController.regist
  * /api/auth/verify-email/{token}:
  *   get:
  *     summary: Verify email address
- *     description: >
- *       Validates the email verification token sent to the student's inbox.
- *       On success, the account becomes active and the student can log in.
- *       The token is single-use and expires after **24 hours**.
  *     tags: [Auth]
  *     parameters:
  *       - in: path
  *         name: token
  *         required: true
  *         schema: { type: string }
- *         description: The raw verification token from the email link
- *         example: a1b2c3d4e5f6...64hexchars
  *     responses:
  *       200:
  *         description: Email verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Email verified successfully. You can now log in.' }
  *       400:
- *         description: Token is invalid or has expired
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *             example: { success: false, message: 'This verification link is invalid or has expired. Please request a new one.' }
- *       500:
- *         $ref: '#/components/responses/ServerError'
+ *         description: Token invalid or expired
  */
 router.get('/verify-email/:token', authController.verifyEmail);
 
@@ -118,11 +74,6 @@ router.get('/verify-email/:token', authController.verifyEmail);
  * /api/auth/resend-verification:
  *   post:
  *     summary: Resend email verification link
- *     description: >
- *       Sends a fresh verification email to the provided address.
- *       Always returns the same generic message regardless of whether
- *       the email exists — this prevents email enumeration.
- *       Google OAuth accounts are silently no-op'd (they are already verified).
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -135,19 +86,9 @@ router.get('/verify-email/:token', authController.verifyEmail);
  *               email:
  *                 type: string
  *                 format: email
- *                 example: john@example.com
  *     responses:
  *       200:
  *         description: Generic response (same whether email exists or not)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'If that email exists and is unverified, a new verification link has been sent.' }
- *       422:
- *         $ref: '#/components/responses/ValidationError'
  */
 router.post('/resend-verification', authValidator.forgotPassword, validate, authController.resendVerification);
 
@@ -155,15 +96,10 @@ router.post('/resend-verification', authValidator.forgotPassword, validate, auth
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Log in with email or username
+ *     summary: Log in with email and password
  *     description: >
- *       Authenticates a local account using **email or username** (passed as `identifier`)
- *       and returns a JWT token on success.
- *
- *       **Guards:**
- *       - Account must have verified email
- *       - Account must not be disabled by admin
- *       - Google-only accounts cannot log in with password
+ *       Frontend sends: `{ email, password }`.
+ *       Also accepts `{ identifier, password }` for Swagger testing.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -171,15 +107,15 @@ router.post('/resend-verification', authValidator.forgotPassword, validate, auth
  *         application/json:
  *           schema:
  *             type: object
- *             required: [identifier, password]
+ *             required: [email, password]
  *             properties:
- *               identifier:
+ *               email:
  *                 type: string
+ *                 format: email
  *                 example: john@example.com
- *                 description: Email address OR username
  *               password:
  *                 type: string
- *                 example: Secret@123
+ *                 example: secret123
  *     responses:
  *       200:
  *         description: Login successful — returns JWT and user profile
@@ -189,25 +125,12 @@ router.post('/resend-verification', authValidator.forgotPassword, validate, auth
  *               type: object
  *               properties:
  *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Login successful.' }
  *                 data:
  *                   $ref: '#/components/schemas/AuthTokenResponse'
- *       400:
- *         description: Account uses Google Sign-In (no password)
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  *       401:
  *         description: Invalid credentials
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *             example: { success: false, message: 'Invalid credentials. Please check your email/username and password.' }
  *       403:
  *         description: Account disabled or email not verified
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */

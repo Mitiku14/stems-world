@@ -4,10 +4,20 @@ const { ENROLLMENT_STATUS } = require('../constants');
 
 const validStatuses = Object.values(ENROLLMENT_STATUS);
 
+// Anonymous enrollment — frontend sends: studentName, email, courseType (string), academicPdf (file)
+// courseType can be either a MongoDB ObjectId OR a frontendId string like "cs-1", "math-3"
 const submit = [
-  body('courseId')
-    .notEmpty().withMessage('Course ID is required')
-    .custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid course ID'),
+  body('studentName')
+    .trim().notEmpty().withMessage('Student name is required')
+    .isLength({ max: 100 }).withMessage('Student name cannot exceed 100 characters'),
+
+  body('email')
+    .trim().notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+
+  body('courseType')
+    .trim().notEmpty().withMessage('Course is required'),
 ];
 
 const enrollmentIdParam = [
@@ -15,10 +25,13 @@ const enrollmentIdParam = [
     .custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid enrollment ID'),
 ];
 
+// rejectionReason is optional — frontend has no input for it
 const reject = [
   ...enrollmentIdParam,
-  body('rejectionReason').trim().notEmpty().withMessage('Rejection reason is required')
-    .isLength({ min: 10, max: 500 }).withMessage('Rejection reason must be 10–500 characters'),
+  body('rejectionReason')
+    .optional()
+    .trim()
+    .isLength({ max: 500 }).withMessage('Rejection reason cannot exceed 500 characters'),
 ];
 
 const adminListQuery = [

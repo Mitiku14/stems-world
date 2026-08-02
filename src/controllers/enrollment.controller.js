@@ -5,24 +5,54 @@ const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
+const mongoose = require('mongoose');
 
+/**
+ * Resolves a course from either:
+ *  - A MongoDB ObjectId string (e.g. "64a1b2c3...")
+ *  - A frontendId string (e.g. "cs-1", "math-3", "english-1")
+ *  - A course title (partial or exact, case-insensitive)
+ */
+const resolveCourse = async (courseType) => {
+  // Try ObjectId first
+  if (mongoose.Types.ObjectId.isValid(courseType)) {
+    return Course.findOne({ _id: courseType, isActive: true });
+  }
+
+  // Try frontendId
+  const byFrontendId = await Course.findOne({ frontendId: courseType, isActive: true });
+  if (byFrontendId) return byFrontendId;
+
+  // Fall back to title match (case-insensitive)
+  return Course.findOne({
+    title: { $regex: new RegExp(courseType.replace(/[-_]/g, '.*'), 'i') },
+    isActive: true,
+  });
+};
+
+/**
+ * POST /api/enrollments
+ * Public (no auth required) — frontend form is shown to anonymous visitors.
+ * Frontend sends: { studentName, email, courseType, academicPdf (file) }
+ * courseType can be a frontendId like "cs-1", "math-3", or a course title.
+ */
 exports.submitEnrollment = asyncHandler(async (req, res) => {
-  const { courseId } = req.body;
-  const student = req.user;
+  const { studentName, email, courseType } = req.body;
 
-  const course = await Course.findOne({ _id: courseId, isActive: true });
+  const course = await resolveCourse(courseType);
   if (!course) throw new ApiError(404, 'Course not found or is no longer available.');
 
+  // Prevent duplicate pending/accepted submissions for the same email + course
   const existing = await Enrollment.findOne({
-    student: student._id,
-    course: courseId,
-    status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.APPROVED] },
+    studentEmail: email.toLowerCase().trim(),
+    course: course._id,
+    status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED] },
   });
 
   if (existing) {
     const msg = existing.status === ENROLLMENT_STATUS.PENDING
       ? 'You already have a pending enrollment for this course.'
-      : 'You are already enrolled in this course.';
+      : 'You are already accepted for this course.';
     throw new ApiError(409, msg);
   }
 
@@ -31,26 +61,30 @@ exports.submitEnrollment = asyncHandler(async (req, res) => {
   }
 
   const enrollment = await Enrollment.create({
-    student: student._id,
-    course: courseId,
+    studentName,
+    studentEmail: email.toLowerCase().trim(),
+    course: course._id,
     academicPdf: req.file ? req.file.filename : null,
   });
 
-  emailService.sendEnrollmentSubmittedEmail(student, course);
-
-  await enrollment.populate('course', 'title description category level');
+  // Confirmation email — fire and forget
+  emailService.sendEnrollmentSubmittedEmail({ name: studentName, email }, course);
 
   return res.status(201).json(
     new ApiResponse(201, 'Enrollment submitted successfully. You will be notified once it has been reviewed.', {
       id:          enrollment._id,
-      course:      enrollment.course,
+      studentName: enrollment.studentName,
+      course:      { id: course._id, title: course.title },
       status:      enrollment.status,
-      academicPdf: enrollment.academicPdf,
       submittedAt: enrollment.createdAt,
     })
   );
 });
 
+/**
+ * GET /api/enrollments/my
+ * Authenticated student only.
+ */
 exports.getMyEnrollments = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
   const p = Number(page);
@@ -83,6 +117,10 @@ exports.getMyEnrollments = asyncHandler(async (req, res) => {
   }));
 });
 
+/**
+ * GET /api/enrollments/my/:id
+ * Authenticated student only.
+ */
 exports.getMyEnrollmentById = asyncHandler(async (req, res) => {
   const enrollment = await Enrollment.findOne({ _id: req.params.id, student: req.user._id })
     .populate('course', 'title description category level requiresDocument')

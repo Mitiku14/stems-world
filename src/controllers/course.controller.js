@@ -74,7 +74,7 @@ exports.deleteCourse = asyncHandler(async (req, res) => {
 
   const activeEnrollments = await Enrollment.countDocuments({
     course: req.params.id,
-    status: ENROLLMENT_STATUS.APPROVED,
+    status: ENROLLMENT_STATUS.ACCEPTED,
   });
 
   if (activeEnrollments > 0) {

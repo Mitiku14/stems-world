@@ -14,20 +14,38 @@ const paginate = (total, page, limit) => ({
   totalPages: Math.ceil(total / limit),
 });
 
+/**
+ * Flattens a raw enrollment document into the shape the admin frontend expects:
+ *   { id, studentName, email, courseType, academicFileName, status, registeredAt }
+ */
+const flattenEnrollment = (e) => ({
+  id:                e._id,
+  studentName:       e.student?.name  || e.studentName  || '—',
+  email:             e.student?.email || e.studentEmail || '—',
+  courseType:        e.course?.title  || '—',
+  academicFileName:  e.academicPdf    || null,
+  status:            e.status,
+  registeredAt:      e.createdAt,
+  rejectionReason:   e.rejectionReason || null,
+  reviewedAt:        e.reviewedAt      || null,
+});
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+
 exports.getDashboard = asyncHandler(async (_req, res) => {
   const [
     totalStudents,
     totalCourses,
     totalEnrollments,
     pendingEnrollments,
-    approvedEnrollments,
+    acceptedEnrollments,
     rejectedEnrollments,
   ] = await Promise.all([
     User.countDocuments({ role: ROLES.STUDENT }),
     Course.countDocuments(),
     Enrollment.countDocuments(),
     Enrollment.countDocuments({ status: ENROLLMENT_STATUS.PENDING }),
-    Enrollment.countDocuments({ status: ENROLLMENT_STATUS.APPROVED }),
+    Enrollment.countDocuments({ status: ENROLLMENT_STATUS.ACCEPTED }),
     Enrollment.countDocuments({ status: ENROLLMENT_STATUS.REJECTED }),
   ]);
 
@@ -37,11 +55,13 @@ exports.getDashboard = asyncHandler(async (_req, res) => {
     enrollments: {
       total:    totalEnrollments,
       pending:  pendingEnrollments,
-      approved: approvedEnrollments,
+      accepted: acceptedEnrollments,
       rejected: rejectedEnrollments,
     },
   }));
 });
+
+// ── Enrollment Management ──────────────────────────────────────────────────
 
 exports.getAllEnrollments = asyncHandler(async (req, res) => {
   const { status, search, page = 1, limit = 10 } = req.query;
@@ -59,12 +79,20 @@ exports.getAllEnrollments = asyncHandler(async (req, res) => {
         { email: { $regex: search, $options: 'i' } },
       ],
     }).select('_id').lean();
-    filter.student = { $in: students.map((u) => u._id) };
+
+    const studentIds = students.map((u) => u._id);
+
+    // Search also covers anonymous enrollments stored by email/name
+    filter.$or = [
+      { student: { $in: studentIds } },
+      { studentName:  { $regex: search, $options: 'i' } },
+      { studentEmail: { $regex: search, $options: 'i' } },
+    ];
   }
 
   const [enrollments, total] = await Promise.all([
     Enrollment.find(filter)
-      .populate('student',    'name email username')
+      .populate('student',    'name email')
       .populate('course',     'title category')
       .populate('reviewedBy', 'name email')
       .sort({ createdAt: -1 })
@@ -75,20 +103,20 @@ exports.getAllEnrollments = asyncHandler(async (req, res) => {
   ]);
 
   return res.json(new ApiResponse(200, 'Enrollments fetched successfully.', {
-    enrollments,
+    enrollments: enrollments.map(flattenEnrollment),
     pagination: paginate(total, p, l),
   }));
 });
 
 exports.getEnrollmentById = asyncHandler(async (req, res) => {
   const enrollment = await Enrollment.findById(req.params.id)
-    .populate('student',    'name email username phone')
+    .populate('student',    'name email phone')
     .populate('course',     'title description category level requiresDocument')
     .populate('reviewedBy', 'name email')
     .lean();
 
   if (!enrollment) throw new ApiError(404, 'Enrollment not found.');
-  return res.json(new ApiResponse(200, 'Enrollment fetched successfully.', enrollment));
+  return res.json(new ApiResponse(200, 'Enrollment fetched successfully.', flattenEnrollment(enrollment)));
 });
 
 exports.approveEnrollment = asyncHandler(async (req, res) => {
@@ -99,18 +127,26 @@ exports.approveEnrollment = asyncHandler(async (req, res) => {
   if (!enrollment) throw new ApiError(404, 'Enrollment not found.');
 
   if (enrollment.status !== ENROLLMENT_STATUS.PENDING) {
-    throw new ApiError(409, `This enrollment has already been ${enrollment.status}. Only pending enrollments can be approved.`);
+    throw new ApiError(409, `This enrollment has already been ${enrollment.status}. Only pending enrollments can be accepted.`);
   }
 
-  enrollment.status          = ENROLLMENT_STATUS.APPROVED;
-  enrollment.reviewedBy      = req.user._id;
-  enrollment.reviewedAt      = new Date();
+  enrollment.status     = ENROLLMENT_STATUS.ACCEPTED;
+  enrollment.reviewedBy = req.user._id;
+  enrollment.reviewedAt = new Date();
   enrollment.rejectionReason = null;
   await enrollment.save();
 
-  emailService.sendEnrollmentApprovedEmail(enrollment.student, enrollment.course);
+  // Send email using student data (may be from populated student or anonymous fields)
+  const recipientName  = enrollment.student?.name  || enrollment.studentName;
+  const recipientEmail = enrollment.student?.email || enrollment.studentEmail;
+  if (recipientEmail) {
+    emailService.sendEnrollmentApprovedEmail(
+      { name: recipientName, email: recipientEmail },
+      enrollment.course
+    );
+  }
 
-  return res.json(new ApiResponse(200, 'Enrollment approved successfully.', {
+  return res.json(new ApiResponse(200, 'Enrollment accepted successfully.', {
     id:         enrollment._id,
     status:     enrollment.status,
     reviewedAt: enrollment.reviewedAt,
@@ -131,12 +167,20 @@ exports.rejectEnrollment = asyncHandler(async (req, res) => {
   }
 
   enrollment.status          = ENROLLMENT_STATUS.REJECTED;
-  enrollment.rejectionReason = rejectionReason;
+  enrollment.rejectionReason = rejectionReason || null;
   enrollment.reviewedBy      = req.user._id;
   enrollment.reviewedAt      = new Date();
   await enrollment.save();
 
-  emailService.sendEnrollmentRejectedEmail(enrollment.student, enrollment.course, rejectionReason);
+  const recipientName  = enrollment.student?.name  || enrollment.studentName;
+  const recipientEmail = enrollment.student?.email || enrollment.studentEmail;
+  if (recipientEmail) {
+    emailService.sendEnrollmentRejectedEmail(
+      { name: recipientName, email: recipientEmail },
+      enrollment.course,
+      rejectionReason || 'No reason provided.'
+    );
+  }
 
   return res.json(new ApiResponse(200, 'Enrollment rejected successfully.', {
     id:              enrollment._id,
@@ -145,6 +189,8 @@ exports.rejectEnrollment = asyncHandler(async (req, res) => {
     reviewedAt:      enrollment.reviewedAt,
   }));
 });
+
+// ── Student Management ─────────────────────────────────────────────────────
 
 exports.getAllStudents = asyncHandler(async (req, res) => {
   const { search, page = 1, limit = 10 } = req.query;

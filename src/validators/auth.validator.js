@@ -1,20 +1,15 @@
 const { body } = require('express-validator');
 
+// Frontend register form only enforces minLength:6 — backend matches that exactly
 const passwordRules = (field) => [
-  body(field).notEmpty().withMessage(`${field === 'password' ? 'Password' : 'New password'} is required`),
-  body(field).isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-  body(field).matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter'),
-  body(field).matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter'),
-  body(field).matches(/[0-9]/).withMessage('Password must contain at least one number'),
+  body(field).notEmpty().withMessage('Password is required'),
+  body(field).isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
 ];
 
+// Frontend signup sends: { fullName, email, password }
+// No username field exists in the frontend form.
 const register = [
-  body('username')
-    .trim().notEmpty().withMessage('Username is required')
-    .isLength({ min: 4, max: 30 }).withMessage('Username must be 4–30 characters')
-    .matches(/^[a-zA-Z0-9_]+$/).withMessage('Username can only contain letters, numbers, and underscores'),
-
-  body('name')
+  body('fullName')
     .trim().notEmpty().withMessage('Full name is required')
     .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
 
@@ -24,12 +19,16 @@ const register = [
     .normalizeEmail(),
 
   ...passwordRules('password'),
-
-  body('phone').optional().trim().isMobilePhone().withMessage('Please provide a valid phone number'),
 ];
 
+// Frontend login sends: { email, password }
+// The frontend uses email field directly (not a combined "identifier" field).
 const login = [
-  body('identifier').trim().notEmpty().withMessage('Email or username is required'),
+  body('email')
+    .trim().notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
@@ -68,7 +67,9 @@ const changePassword = [
   ...passwordRules('newPassword'),
 
   body('newPassword').custom((value, { req }) => {
-    if (value === req.body.currentPassword) throw new Error('New password must be different from your current password');
+    if (value === req.body.currentPassword) {
+      throw new Error('New password must be different from your current password');
+    }
     return true;
   }),
 ];
@@ -77,4 +78,12 @@ const googleSignIn = [
   body('idToken').trim().notEmpty().withMessage('Google ID token is required'),
 ];
 
-module.exports = { register, login, forgotPassword, resetPassword, updateProfile, changePassword, googleSignIn };
+module.exports = {
+  register,
+  login,
+  forgotPassword,
+  resetPassword,
+  updateProfile,
+  changePassword,
+  googleSignIn,
+};

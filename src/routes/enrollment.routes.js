@@ -2,97 +2,61 @@ const express = require('express');
 const router = express.Router();
 
 const enrollmentController = require('../controllers/enrollment.controller');
-const enrollmentValidator = require('../validators/enrollment.validator');
-const { validate } = require('../middleware/validate.middleware');
-const { verifyToken } = require('../middleware/auth.middleware');
-const { requireRole } = require('../middleware/role.middleware');
-const upload = require('../config/multer');
-const { ROLES } = require('../constants');
-
-// All enrollment routes require an authenticated student
-router.use(verifyToken, requireRole(ROLES.STUDENT));
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Enrollment Routes
-// ─────────────────────────────────────────────────────────────────────────────
+const enrollmentValidator  = require('../validators/enrollment.validator');
+const { validate }         = require('../middleware/validate.middleware');
+const { verifyToken }      = require('../middleware/auth.middleware');
+const { requireRole }      = require('../middleware/role.middleware');
+const upload               = require('../config/multer');
+const { ROLES }            = require('../constants');
 
 /**
  * @swagger
  * /api/enrollments:
  *   post:
- *     summary: Submit a course enrollment
+ *     summary: Submit a course enrollment (public)
  *     description: >
- *       Submits an enrollment request for a course.
+ *       Submits an enrollment request for a course. **No authentication required.**
+ *       The frontend form is shown to anonymous visitors.
  *
- *       **Rules:**
- *       - Student cannot have a pending or approved enrollment for the same course
- *       - If `course.requiresDocument = true`, an academic PDF must be uploaded
- *       - Request must use `multipart/form-data` (even when no file is attached)
- *       - PDF file size limit: **5 MB**
- *       - Only PDF files are accepted
+ *       `courseType` can be:
+ *       - A frontend ID like `"cs-1"`, `"math-3"`, `"english-1"`
+ *       - A MongoDB ObjectId
+ *       - A partial course title (case-insensitive)
  *
- *       A confirmation email is sent to the student upon successful submission.
- *       The enrollment starts with status `pending` and awaits admin review.
+ *       Request must use `multipart/form-data`.
  *     tags: [Enrollments]
- *     security:
- *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [courseId]
+ *             required: [studentName, email, courseType]
  *             properties:
- *               courseId:
+ *               studentName:
  *                 type: string
- *                 description: MongoDB ObjectId of the course to enroll in
- *                 example: 64a1b2c3d4e5f6789012abcd
+ *                 example: John Doe
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: john@example.com
+ *               courseType:
+ *                 type: string
+ *                 example: cs-1
+ *                 description: Frontend ID, ObjectId, or course title
  *               academicPdf:
  *                 type: string
  *                 format: binary
- *                 description: >
- *                   Academic PDF document (required only if the course has
- *                   `requiresDocument = true`). Max 5 MB.
+ *                 description: Required only if the course has requiresDocument=true. Max 5 MB.
  *     responses:
  *       201:
  *         description: Enrollment submitted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Enrollment submitted successfully. You will be notified once it has been reviewed.' }
- *                 data:
- *                   type: object
- *                   properties:
- *                     id: { type: string, example: '64a1b2c3d4e5f6789012abcd' }
- *                     course: { $ref: '#/components/schemas/Course' }
- *                     status: { type: string, example: 'pending' }
- *                     academicPdf: { type: string, nullable: true, example: 'a1b2c3d4-uuid.pdf' }
- *                     submittedAt: { type: string, format: date-time }
  *       400:
- *         description: PDF required but not provided, or invalid file type
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *             example: { success: false, message: 'An academic PDF document is required to enroll in this course.' }
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
+ *         description: PDF required but not provided
  *       404:
- *         description: Course not found or inactive
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *         description: Course not found
  *       409:
- *         description: Duplicate enrollment (pending or approved already exists)
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *             example: { success: false, message: 'You already have a pending enrollment for this course.' }
+ *         description: Duplicate pending or accepted enrollment
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */
@@ -104,14 +68,14 @@ router.post(
   enrollmentController.submitEnrollment
 );
 
+// The following routes still require an authenticated student
+router.use(verifyToken, requireRole(ROLES.STUDENT));
+
 /**
  * @swagger
  * /api/enrollments/my:
  *   get:
  *     summary: Get all enrollments for the current student
- *     description: >
- *       Returns a paginated list of all enrollments belonging to the
- *       authenticated student. Optionally filter by status.
  *     tags: [Enrollments]
  *     security:
  *       - BearerAuth: []
@@ -120,37 +84,14 @@ router.post(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, approved, rejected]
- *         description: Filter by enrollment status
+ *           enum: [pending, accepted, rejected]
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
  *         description: Enrollments fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Enrollments fetched successfully.' }
- *                 data:
- *                   type: object
- *                   properties:
- *                     enrollments:
- *                       type: array
- *                       items: { $ref: '#/components/schemas/Enrollment' }
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *       400:
- *         description: Invalid status filter value
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
  */
 router.get('/my', enrollmentController.getMyEnrollments);
 
@@ -159,9 +100,6 @@ router.get('/my', enrollmentController.getMyEnrollments);
  * /api/enrollments/my/{id}:
  *   get:
  *     summary: Get a specific enrollment by ID
- *     description: >
- *       Returns detailed information about a single enrollment.
- *       The enrollment must belong to the authenticated student.
  *     tags: [Enrollments]
  *     security:
  *       - BearerAuth: []
@@ -170,33 +108,11 @@ router.get('/my', enrollmentController.getMyEnrollments);
  *         name: id
  *         required: true
  *         schema: { type: string }
- *         description: MongoDB ObjectId of the enrollment
- *         example: 64a1b2c3d4e5f6789012abcd
  *     responses:
  *       200:
  *         description: Enrollment fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean, example: true }
- *                 message: { type: string, example: 'Enrollment fetched successfully.' }
- *                 data: { $ref: '#/components/schemas/Enrollment' }
- *       400:
- *         description: Invalid enrollment ID format
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
- *       401:
- *         $ref: '#/components/responses/Unauthorized'
- *       403:
- *         $ref: '#/components/responses/Forbidden'
  *       404:
- *         description: Enrollment not found or does not belong to this student
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ *         $ref: '#/components/responses/NotFound'
  */
 router.get('/my/:id', enrollmentValidator.enrollmentIdParam, validate, enrollmentController.getMyEnrollmentById);
 
