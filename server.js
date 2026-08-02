@@ -42,6 +42,7 @@ const allowedOrigins = [
   process.env.API_URL,
   'https://stem-frontend-delta.vercel.app', // production frontend on Vercel
   'http://localhost:3000',
+  'http://localhost:5000', // Swagger UI "Try it out" sends requests from the server's own origin
   'http://localhost:5173',
 ].filter(Boolean); // remove undefined entries
 
