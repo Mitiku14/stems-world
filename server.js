@@ -56,6 +56,8 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (Postman, mobile apps, curl, server-to-server)
     if (!origin) return callback(null, true);
+    // Always allow the server's own origin (Swagger UI "Try it out")
+    if (origin === `http://localhost:${env.port}`) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin '${origin}' is not allowed.`));
   },
