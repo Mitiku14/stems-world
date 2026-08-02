@@ -1,8 +1,13 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 
-// In development the server is localhost.
-// On Render, set API_URL=https://your-app.onrender.com in the environment variables.
-const serverUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 5000}`;
+// Determine the correct server URL:
+// 1. API_URL env var (set this on Render to your deployed URL)
+// 2. RENDER_EXTERNAL_URL — Render automatically injects this on all services
+// 3. Fall back to localhost for local development
+const serverUrl =
+  process.env.API_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  `http://localhost:${process.env.PORT || 5000}`;
 
 const options = {
   definition: {
