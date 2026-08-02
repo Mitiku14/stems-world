@@ -40,7 +40,8 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   env.clientUrl,
   process.env.API_URL,
-  'https://stem-frontend-delta.vercel.app', // production frontend on Vercel
+  'https://stems-world-backend.onrender.com', // Render deployment — Swagger UI "Try it out"
+  'https://stem-frontend-delta.vercel.app',   // production frontend on Vercel
   'http://localhost:3000',
   'http://localhost:5000', // Swagger UI "Try it out" sends requests from the server's own origin
   'http://localhost:5173',
