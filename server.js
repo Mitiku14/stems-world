@@ -54,11 +54,15 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, mobile apps, curl, server-to-server)
+    // Allow requests with no origin (Postman, curl, server-to-server calls)
     if (!origin) return callback(null, true);
-    // Always allow the server's own origin (Swagger UI "Try it out")
-    if (origin === `http://localhost:${env.port}`) return callback(null, true);
+
+    // Allow any Render deployment of this app (handles dynamic subdomains)
+    if (origin.endsWith('.onrender.com')) return callback(null, true);
+
+    // Allow explicitly listed origins
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
     callback(new Error(`CORS: origin '${origin}' is not allowed.`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
