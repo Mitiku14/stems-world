@@ -1,6 +1,7 @@
 const User       = require('../models/User');
 const Course     = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
+const bcrypt     = require('bcryptjs');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -263,4 +264,35 @@ exports.deleteStudent = asyncHandler(async (req, res) => {
   await student.deleteOne();
 
   return res.json(new ApiResponse(200, 'Student and all associated data deleted successfully.'));
+});
+
+// ── Admin Management ───────────────────────────────────────────────────────
+
+exports.createAdmin = asyncHandler(async (req, res) => {
+  const { name, username, email, password } = req.body;
+
+  const existingEmail = await User.findOne({ email });
+  if (existingEmail) throw new ApiError(409, 'An account with that email already exists.');
+
+  const existingUsername = await User.findOne({ username });
+  if (existingUsername) throw new ApiError(409, 'An account with that username already exists.');
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  const admin = await User.create({
+    name,
+    username,
+    email,
+    password: hashedPassword,
+    role: ROLES.ADMIN,
+    isEmailVerified: true, // Admins created by admins do not need email verification
+  });
+
+  return res.status(201).json(new ApiResponse(201, 'Admin account created successfully.', {
+    id: admin._id,
+    name: admin.name,
+    username: admin.username,
+    email: admin.email,
+    role: admin.role,
+  }));
 });

@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 
 const adminController      = require('../controllers/admin.controller');
 const contactController    = require('../controllers/contact.controller');
+const adminValidator       = require('../validators/admin.validator');
 const enrollmentValidator  = require('../validators/enrollment.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
@@ -289,4 +290,56 @@ router.patch('/students/:id/toggle-status', studentIdParam, validate, adminContr
  */
 router.delete('/students/:id', studentIdParam, validate, adminController.deleteStudent);
 
+// ── Admin Management ───────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/admins:
+ *   post:
+ *     summary: Create a new admin account
+ *     description: >
+ *       Creates a new admin user. Only accessible by authenticated admins.
+ *       The new account is immediately active and email-verified.
+ *     tags: [Admin — Admins]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Jane Smith
+ *               username:
+ *                 type: string
+ *                 example: jane_smith
+ *               email:
+ *                 type: string
+ *                 example: jane@example.com
+ *               password:
+ *                 type: string
+ *                 example: SecurePass123
+ *     responses:
+ *       201:
+ *         description: Admin account created successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       409:
+ *         description: Email or username already exists
+ */
+router.post('/admins', adminValidator.createAdmin, validate, adminController.createAdmin);
+
 module.exports = router;
+

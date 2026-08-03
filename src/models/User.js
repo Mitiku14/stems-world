@@ -41,9 +41,9 @@ const userSchema = new mongoose.Schema(
     },
 
     // Google's stable 'sub' claim — primary lookup key for returning Google users
+    // No default — field must be absent (not null) for sparse unique index to work
     googleId: {
       type: String,
-      default: null,
       unique: true,
       sparse: true,
     },
