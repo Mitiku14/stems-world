@@ -1,16 +1,23 @@
 const nodemailer = require('nodemailer');
 const env = require('../config/env');
 
-// Single transporter instance — Nodemailer manages the connection pool internally
-const transporter = nodemailer.createTransport({
-  host: env.email.host,
-  port: env.email.port,
-  auth: { user: env.email.user, pass: env.email.pass },
-});
+// Lazy transporter — created on first use so env vars are guaranteed to be loaded.
+// This prevents issues on Render where the module may load before env is fully injected.
+let _transporter = null;
+const getTransporter = () => {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: env.email.host,
+      port: env.email.port,
+      auth: { user: env.email.user, pass: env.email.pass },
+    });
+  }
+  return _transporter;
+};
 
 const sendEmail = async ({ to, subject, html }) => {
   try {
-    await transporter.sendMail({ from: env.email.from, to, subject, html });
+    await getTransporter().sendMail({ from: env.email.from, to, subject, html });
   } catch (error) {
     console.error(`[EmailService] Failed to send "${subject}" to ${to}:`, error.message);
   }

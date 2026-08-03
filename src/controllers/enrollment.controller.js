@@ -37,7 +37,7 @@ const resolveCourse = async (courseType) => {
  * courseType can be a frontendId like "cs-1", "math-3", or a course title.
  */
 exports.submitEnrollment = asyncHandler(async (req, res) => {
-  const { studentName, email, courseType } = req.body;
+  const { studentName, email, courseType, academicPdf } = req.body;
 
   const course = await resolveCourse(courseType);
   if (!course) throw new ApiError(404, 'Course not found or is no longer available.');
@@ -56,15 +56,15 @@ exports.submitEnrollment = asyncHandler(async (req, res) => {
     throw new ApiError(409, msg);
   }
 
-  if (course.requiresDocument && !req.file) {
-    throw new ApiError(400, 'An academic PDF document is required to enroll in this course.');
+  if (course.requiresDocument && !academicPdf) {
+    throw new ApiError(400, 'An academic PDF public URL is required to enroll in this course.');
   }
 
   const enrollment = await Enrollment.create({
     studentName,
     studentEmail: email.toLowerCase().trim(),
     course: course._id,
-    academicPdf: req.file ? req.file.filename : null,
+    academicPdf: academicPdf || null,
   });
 
   // Confirmation email — fire and forget

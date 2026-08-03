@@ -78,7 +78,12 @@ exports.register = asyncHandler(async (req, res) => {
   });
 
   const rawToken = await tokenService.createToken(user._id, TOKEN_TYPES.EMAIL_VERIFICATION);
-  await emailService.sendVerificationEmail(user, rawToken);
+
+  // Fire and forget — email failure must never fail the registration response.
+  // The user is already created in the DB. They can always use resend-verification.
+  emailService.sendVerificationEmail(user, rawToken).catch((err) =>
+    console.error('[Register] Failed to send verification email:', err.message)
+  );
 
   return res.status(201).json(
     new ApiResponse(201, 'Registration successful. Please check your email to verify your account.')
@@ -119,7 +124,11 @@ exports.resendVerification = asyncHandler(async (req, res) => {
   if (!user || user.isEmailVerified) return res.json(new ApiResponse(200, genericMsg));
 
   const rawToken = await tokenService.createToken(user._id, TOKEN_TYPES.EMAIL_VERIFICATION);
-  await emailService.sendVerificationEmail(user, rawToken);
+
+  // Fire and forget
+  emailService.sendVerificationEmail(user, rawToken).catch((err) =>
+    console.error('[ResendVerification] Failed to send email:', err.message)
+  );
 
   return res.json(new ApiResponse(200, genericMsg));
 });
@@ -227,7 +236,11 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   }
 
   const rawToken = await tokenService.createToken(user._id, TOKEN_TYPES.PASSWORD_RESET);
-  await emailService.sendPasswordResetEmail(user, rawToken);
+
+  // Fire and forget — same pattern as register
+  emailService.sendPasswordResetEmail(user, rawToken).catch((err) =>
+    console.error('[ForgotPassword] Failed to send reset email:', err.message)
+  );
 
   return res.json(new ApiResponse(200, genericMsg));
 });

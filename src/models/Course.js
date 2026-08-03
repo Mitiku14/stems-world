@@ -36,6 +36,14 @@ const courseSchema = new mongoose.Schema(
       default: false,
     },
 
+
+    // Optional image URL for the course card (external URL or relative path)
+    imageUrl: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

@@ -19,6 +19,7 @@ const courses = [
     category: 'programming',
     level: 'beginner',
     requiresDocument: false,
+    imageUrl: '/cs/programming.jpg',
   },
   {
     frontendId: 'cs-2',
@@ -27,6 +28,7 @@ const courses = [
     category: 'programming',
     level: 'intermediate',
     requiresDocument: true,
+    imageUrl: '/cs/ml.jpg',
   },
   {
     frontendId: 'cs-3',
@@ -35,6 +37,7 @@ const courses = [
     category: 'programming',
     level: 'beginner',
     requiresDocument: false,
+    imageUrl: '/cs/basics.jpg',
   },
   {
     frontendId: 'english-1',
@@ -43,6 +46,7 @@ const courses = [
     category: 'language',
     level: 'all',
     requiresDocument: false,
+    imageUrl: '/english/English-class.jpg',
   },
   {
     frontendId: 'math-3',
@@ -51,6 +55,7 @@ const courses = [
     category: 'mathematics',
     level: 'beginner',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-3.webp',
   },
   {
     frontendId: 'math-4',
@@ -59,6 +64,7 @@ const courses = [
     category: 'mathematics',
     level: 'beginner',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-4.webp',
   },
   {
     frontendId: 'math-5',
@@ -67,6 +73,7 @@ const courses = [
     category: 'mathematics',
     level: 'beginner',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-5.webp',
   },
   {
     frontendId: 'math-6',
@@ -75,6 +82,7 @@ const courses = [
     category: 'mathematics',
     level: 'intermediate',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-6.webp',
   },
   {
     frontendId: 'math-7',
@@ -83,6 +91,7 @@ const courses = [
     category: 'mathematics',
     level: 'intermediate',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-7.webp',
   },
   {
     frontendId: 'math-8',
@@ -91,6 +100,7 @@ const courses = [
     category: 'mathematics',
     level: 'intermediate',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-8.webp',
   },
   {
     frontendId: 'math-9',
@@ -99,6 +109,7 @@ const courses = [
     category: 'mathematics',
     level: 'advanced',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-9.webp',
   },
   {
     frontendId: 'math-10',
@@ -107,6 +118,7 @@ const courses = [
     category: 'mathematics',
     level: 'advanced',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-10.webp',
   },
   {
     frontendId: 'math-11',
@@ -115,6 +127,7 @@ const courses = [
     category: 'mathematics',
     level: 'advanced',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-11.webp',
   },
   {
     frontendId: 'math-12',
@@ -123,6 +136,7 @@ const courses = [
     category: 'mathematics',
     level: 'advanced',
     requiresDocument: true,
+    imageUrl: '/math/Math-class-12.webp',
   },
   {
     frontendId: 'steam-1',
@@ -131,6 +145,7 @@ const courses = [
     category: 'science',
     level: 'intermediate',
     requiresDocument: true,
+    imageUrl: null,
   },
 ];
 

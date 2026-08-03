@@ -17,6 +17,9 @@ const create = [
 
   body('requiresDocument').optional()
     .isBoolean().withMessage('requiresDocument must be a boolean'),
+
+  body('imageUrl').optional({ checkFalsy: true }).trim()
+    .isURL().withMessage('imageUrl must be a valid URL'),
 ];
 
 const update = [
@@ -34,6 +37,9 @@ const update = [
 
   body('requiresDocument').optional()
     .isBoolean().withMessage('requiresDocument must be a boolean'),
+
+  body('imageUrl').optional({ checkFalsy: true }).trim()
+    .isURL().withMessage('imageUrl must be a valid URL'),
 ];
 
 const courseIdParam = [

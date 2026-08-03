@@ -18,6 +18,11 @@ const submit = [
 
   body('courseType')
     .trim().notEmpty().withMessage('Course is required'),
+
+  body('academicPdf')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isURL().withMessage('Academic PDF must be a valid public URL'),
 ];
 
 const enrollmentIdParam = [

@@ -6,7 +6,6 @@ const enrollmentValidator  = require('../validators/enrollment.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
 const { requireRole }      = require('../middleware/role.middleware');
-const upload               = require('../config/multer');
 const { ROLES }            = require('../constants');
 
 /**
@@ -23,12 +22,12 @@ const { ROLES }            = require('../constants');
  *       - A MongoDB ObjectId
  *       - A partial course title (case-insensitive)
  *
- *       Request must use `multipart/form-data`.
+ *       Request must use `application/json`.
  *     tags: [Enrollments]
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
  *             required: [studentName, email, courseType]
@@ -46,8 +45,8 @@ const { ROLES }            = require('../constants');
  *                 description: Frontend ID, ObjectId, or course title
  *               academicPdf:
  *                 type: string
- *                 format: binary
- *                 description: Required only if the course has requiresDocument=true. Max 5 MB.
+ *                 format: uri
+ *                 description: Public URL to the academic PDF. Required if requiresDocument=true.
  *     responses:
  *       201:
  *         description: Enrollment submitted successfully
@@ -62,7 +61,6 @@ const { ROLES }            = require('../constants');
  */
 router.post(
   '/',
-  upload.single('academicPdf'),
   enrollmentValidator.submit,
   validate,
   enrollmentController.submitEnrollment
