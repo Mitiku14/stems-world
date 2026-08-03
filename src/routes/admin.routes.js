@@ -296,10 +296,10 @@ router.delete('/students/:id', studentIdParam, validate, adminController.deleteS
  * @swagger
  * /api/admin/admins:
  *   post:
- *     summary: Create a new admin account
+ *     summary: Promote a user to admin
  *     description: >
- *       Creates a new admin user. Only accessible by authenticated admins.
- *       The new account is immediately active and email-verified.
+ *       Promotes an existing registered user to an admin using only their email address.
+ *       Only accessible by authenticated admins.
  *     tags: [Admin — Admins]
  *     security:
  *       - BearerAuth: []
@@ -310,34 +310,24 @@ router.delete('/students/:id', studentIdParam, validate, adminController.deleteS
  *           schema:
  *             type: object
  *             required:
- *               - name
- *               - username
  *               - email
- *               - password
  *             properties:
- *               name:
- *                 type: string
- *                 example: Jane Smith
- *               username:
- *                 type: string
- *                 example: jane_smith
  *               email:
  *                 type: string
- *                 example: jane@example.com
- *               password:
- *                 type: string
- *                 example: SecurePass123
+ *                 example: existinguser@example.com
  *     responses:
- *       201:
- *         description: Admin account created successfully
+ *       200:
+ *         description: User promoted to admin successfully
  *       400:
  *         description: Validation error
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  *       403:
  *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         description: No registered user found with that email address
  *       409:
- *         description: Email or username already exists
+ *         description: User is already an admin
  */
 router.post('/admins', adminValidator.createAdmin, validate, adminController.createAdmin);
 

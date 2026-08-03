@@ -1,7 +1,7 @@
 const User       = require('../models/User');
 const Course     = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
-const bcrypt     = require('bcryptjs');
+
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -269,30 +269,23 @@ exports.deleteStudent = asyncHandler(async (req, res) => {
 // ── Admin Management ───────────────────────────────────────────────────────
 
 exports.createAdmin = asyncHandler(async (req, res) => {
-  const { name, username, email, password } = req.body;
+  const { email } = req.body;
 
-  const existingEmail = await User.findOne({ email });
-  if (existingEmail) throw new ApiError(409, 'An account with that email already exists.');
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError(404, 'No registered user found with that email address.');
 
-  const existingUsername = await User.findOne({ username });
-  if (existingUsername) throw new ApiError(409, 'An account with that username already exists.');
+  if (user.role === ROLES.ADMIN) {
+    throw new ApiError(409, 'User is already an admin.');
+  }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
+  user.role = ROLES.ADMIN;
+  await user.save();
 
-  const admin = await User.create({
-    name,
-    username,
-    email,
-    password: hashedPassword,
-    role: ROLES.ADMIN,
-    isEmailVerified: true, // Admins created by admins do not need email verification
-  });
-
-  return res.status(201).json(new ApiResponse(201, 'Admin account created successfully.', {
-    id: admin._id,
-    name: admin.name,
-    username: admin.username,
-    email: admin.email,
-    role: admin.role,
+  return res.status(200).json(new ApiResponse(200, 'User promoted to admin successfully.', {
+    id: user._id,
+    name: user.name,
+    username: user.username,
+    email: user.email,
+    role: user.role,
   }));
 });
