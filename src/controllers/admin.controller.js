@@ -126,6 +126,7 @@ exports.approveEnrollment = asyncHandler(async (req, res) => {
     .populate('course',  'title _id');
 
   if (!enrollment) throw new ApiError(404, 'Enrollment not found.');
+  if (!enrollment.course) throw new ApiError(404, 'The associated course no longer exists.');
 
   if (enrollment.status !== ENROLLMENT_STATUS.PENDING) {
     throw new ApiError(409, `This enrollment has already been ${enrollment.status}. Only pending enrollments can be accepted.`);
@@ -162,6 +163,7 @@ exports.rejectEnrollment = asyncHandler(async (req, res) => {
     .populate('course',  'title _id');
 
   if (!enrollment) throw new ApiError(404, 'Enrollment not found.');
+  if (!enrollment.course) throw new ApiError(404, 'The associated course no longer exists.');
 
   if (enrollment.status !== ENROLLMENT_STATUS.PENDING) {
     throw new ApiError(409, `This enrollment has already been ${enrollment.status}. Only pending enrollments can be rejected.`);
