@@ -19,7 +19,25 @@ const create = [
     .isBoolean().withMessage('requiresDocument must be a boolean'),
 
   body('imageUrl').optional({ checkFalsy: true }).trim()
-    .isURL().withMessage('imageUrl must be a valid URL'),
+    .custom((value) => {
+      // Allow relative paths starting with '/'
+      if (value.startsWith('/')) {
+        if (/\s/.test(value)) {
+          throw new Error('Relative image path must not contain spaces');
+        }
+        return true;
+      }
+      // Otherwise validate as an absolute URL
+      try {
+        const url = new URL(value);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          throw new Error('imageUrl must be an HTTP or HTTPS URL');
+        }
+        return true;
+      } catch (err) {
+        throw new Error('imageUrl must be a valid URL or relative path starting with /');
+      }
+    }),
 ];
 
 const update = [
@@ -39,7 +57,25 @@ const update = [
     .isBoolean().withMessage('requiresDocument must be a boolean'),
 
   body('imageUrl').optional({ checkFalsy: true }).trim()
-    .isURL().withMessage('imageUrl must be a valid URL'),
+    .custom((value) => {
+      // Allow relative paths starting with '/'
+      if (value.startsWith('/')) {
+        if (/\s/.test(value)) {
+          throw new Error('Relative image path must not contain spaces');
+        }
+        return true;
+      }
+      // Otherwise validate as an absolute URL
+      try {
+        const url = new URL(value);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          throw new Error('imageUrl must be an HTTP or HTTPS URL');
+        }
+        return true;
+      } catch (err) {
+        throw new Error('imageUrl must be a valid URL or relative path starting with /');
+      }
+    }),
 ];
 
 const courseIdParam = [

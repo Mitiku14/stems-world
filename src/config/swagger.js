@@ -157,6 +157,12 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
               example: true,
               description: 'If true, students must upload an academic PDF when enrolling',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              example: '/cs/programming.jpg',
+              description: 'Optional image URL for the course card (external URL or relative path)',
+            },
             isActive: { type: 'boolean', example: true },
             createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
           },

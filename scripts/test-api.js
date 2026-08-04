@@ -266,19 +266,39 @@ const run = async () => {
   section('COURSES — ADMIN CRUD');
   let newCourseId = '';
   {
+    // Create course with a valid relative imageUrl
     const r = await req('POST', '/api/courses', {
       title: `Test Course ${ts}`, description: 'Created by test script',
       category: 'programming', level: 'beginner', requiresDocument: false,
+      imageUrl: '/cs/programming.jpg',
     }, adminToken);
     ok('POST /courses (admin) → 201', r.status === 201, 201, r.status);
-    if (r.body.data) newCourseId = r.body.data._id;
+    if (r.body.data) {
+      newCourseId = r.body.data._id;
+      ok('POST /courses includes imageUrl', r.body.data.imageUrl === '/cs/programming.jpg', true, r.body.data.imageUrl);
+    }
+
+    // Test validation for bad imageUrl
+    const rVal = await req('POST', '/api/courses', {
+      title: `Test Course Bad URL ${ts}`, description: 'Created by test script',
+      category: 'programming', level: 'beginner', requiresDocument: false,
+      imageUrl: 'not-a-valid-url-and-not-starting-with-slash'
+    }, adminToken);
+    ok('POST /courses with bad imageUrl → 422', rVal.status === 422, 422, rVal.status);
 
     const r2 = await req('POST', '/api/courses', { title: 'Unauthorized' }, studentToken);
     ok('POST /courses (student) → 403', r2.status === 403, 403, r2.status);
 
     if (newCourseId) {
-      const r3 = await req('PUT', `/api/courses/${newCourseId}`, { description: 'Updated' }, adminToken);
+      // Update course with a valid absolute imageUrl
+      const r3 = await req('PUT', `/api/courses/${newCourseId}`, {
+        description: 'Updated',
+        imageUrl: 'https://example.com/another-image.png'
+      }, adminToken);
       ok('PUT /courses/:id (admin) → 200', r3.status === 200, 200, r3.status);
+      if (r3.body.data) {
+        ok('PUT /courses/:id includes updated imageUrl', r3.body.data.imageUrl === 'https://example.com/another-image.png', true, r3.body.data.imageUrl);
+      }
 
       const r4 = await req('PATCH', `/api/courses/${newCourseId}/toggle-status`, null, adminToken);
       ok('PATCH /courses/:id/toggle-status → 200', r4.status === 200, 200, r4.status);

@@ -141,6 +141,11 @@ router.get('/:id', courseValidator.courseIdParam, validate, courseController.get
  *                 type: boolean
  *                 example: false
  *                 description: If true, students must upload an academic PDF to enroll
+ *               imageUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 example: /cs/programming.jpg
+ *                 description: Optional image URL for the course card (external URL or relative path)
  *     responses:
  *       201:
  *         description: Course created successfully
@@ -209,6 +214,10 @@ router.post(
  *                 enum: [beginner, intermediate, advanced, all]
  *               requiresDocument:
  *                 type: boolean
+ *               imageUrl:
+ *                 type: string
+ *                 nullable: true
+ *                 example: https://example.com/course-image.jpg
  *     responses:
  *       200:
  *         description: Course updated successfully
