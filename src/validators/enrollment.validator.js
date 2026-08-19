@@ -22,7 +22,16 @@ const submit = [
   body('academicPdf')
     .optional({ checkFalsy: true })
     .trim()
-    .isURL().withMessage('Academic PDF must be a valid public URL'),
+    .isURL({ protocols: ['http', 'https'], require_protocol: true }).withMessage('Academic PDF must be a valid HTTP/HTTPS URL'),
+
+  body('grade')
+    .optional({ nullable: true })
+    .trim()
+    .isLength({ max: 20 }).withMessage('Grade cannot exceed 20 characters'),
+
+  body('site')
+    .optional({ nullable: true })
+    .isMongoId().withMessage('Site must be a valid ID'),
 ];
 
 const enrollmentIdParam = [
@@ -30,12 +39,11 @@ const enrollmentIdParam = [
     .custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid enrollment ID'),
 ];
 
-// rejectionReason is optional — frontend has no input for it
+// rejectionReason is required
 const reject = [
   ...enrollmentIdParam,
   body('rejectionReason')
-    .optional()
-    .trim()
+    .trim().notEmpty().withMessage('Rejection reason is required when rejecting an enrollment.')
     .isLength({ max: 500 }).withMessage('Rejection reason cannot exceed 500 characters'),
 ];
 

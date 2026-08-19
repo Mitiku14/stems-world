@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 
 const courseController = require('../controllers/course.controller');
+const resourceController = require('../controllers/resource.controller');
 const courseValidator = require('../validators/course.validator');
+const resourceValidator = require('../validators/resource.validator');
 const { validate } = require('../middleware/validate.middleware');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/role.middleware');
@@ -103,6 +105,25 @@ router.get('/', courseValidator.listQuery, validate, courseController.getCourses
  *         $ref: '#/components/responses/NotFound'
  */
 router.get('/:id', courseValidator.courseIdParam, validate, courseController.getCourse);
+
+/**
+ * @swagger
+ * /api/courses/{courseId}/resources:
+ *   get:
+ *     summary: Get active learning resources for a course
+ *     tags: [Courses]
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Course resources fetched successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, resourceController.getCourseResources);
 
 /**
  * @swagger

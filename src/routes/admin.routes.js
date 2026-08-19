@@ -5,8 +5,20 @@ const mongoose = require('mongoose');
 
 const adminController      = require('../controllers/admin.controller');
 const contactController    = require('../controllers/contact.controller');
+const siteController       = require('../controllers/site.controller');
+const compRegController    = require('../controllers/competitionRegistration.controller');
+const exportController     = require('../controllers/export.controller');
+const notificationController = require('../controllers/notification.controller');
+const certificateController = require('../controllers/certificate.controller');
+const resourceController   = require('../controllers/resource.controller');
+
 const adminValidator       = require('../validators/admin.validator');
 const enrollmentValidator  = require('../validators/enrollment.validator');
+const siteValidator        = require('../validators/site.validator');
+const compRegValidator     = require('../validators/competitionRegistration.validator');
+const notificationValidator = require('../validators/notification.validator');
+const certificateValidator = require('../validators/certificate.validator');
+const resourceValidator    = require('../validators/resource.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
 const { requireRole }      = require('../middleware/role.middleware');
@@ -53,6 +65,16 @@ const studentListQuery = [
  *                   properties:
  *                     totalStudents: { type: integer, example: 42 }
  *                     totalCourses: { type: integer, example: 6 }
+ *                     competitions:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer, example: 2 }
+ *                         active: { type: integer, example: 1 }
+ *                         registrations:
+ *                           type: object
+ *                           properties:
+ *                             total: { type: integer, example: 15 }
+ *                             pending: { type: integer, example: 3 }
  *                     enrollments:
  *                       type: object
  *                       properties:
@@ -331,5 +353,525 @@ router.delete('/students/:id', studentIdParam, validate, adminController.deleteS
  */
 router.post('/admins', adminValidator.createAdmin, validate, adminController.createAdmin);
 
+// ── Course Management ──────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/courses:
+ *   get:
+ *     summary: List all courses (including inactive)
+ *     tags: [Admin — Courses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
+ *         name: level
+ *         schema: { type: string }
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *     responses:
+ *       200:
+ *         description: Courses fetched successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+router.get('/courses', adminController.getAllCourses);
+
+// ── Competition Registration Management ────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/competition-registrations:
+ *   get:
+ *     summary: List all competition registrations
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [pending, accepted, rejected] }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: competitionId
+ *         schema: { type: string }
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *     responses:
+ *       200:
+ *         description: Registrations fetched successfully
+ */
+router.get(
+  '/competition-registrations', 
+  compRegValidator.adminListQuery, 
+  validate, 
+  compRegController.getAllRegistrations
+);
+
+/**
+ * @swagger
+ * /api/admin/competition-registrations/{id}/approve:
+ *   patch:
+ *     summary: Approve a competition registration
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Registration accepted
+ */
+router.patch(
+  '/competition-registrations/:id/approve', 
+  compRegValidator.registrationIdParam, 
+  validate, 
+  compRegController.approveRegistration
+);
+
+/**
+ * @swagger
+ * /api/admin/competition-registrations/{id}/reject:
+ *   patch:
+ *     summary: Reject a competition registration
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               rejectionReason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Registration rejected
+ */
+router.patch(
+  '/competition-registrations/:id/reject', 
+  compRegValidator.rejectRegistrationRules, 
+  validate, 
+  compRegController.rejectRegistration
+);
+
+
+// ── Site Management ────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/sites:
+ *   get:
+ *     summary: List all sites (including inactive)
+ *     tags: [Admin — Sites]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *     responses:
+ *       200:
+ *         description: Sites fetched successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+router.get('/sites', siteValidator.listQuery, validate, siteController.getAllSites);
+
+/**
+ * @swagger
+ * /api/admin/sites:
+ *   post:
+ *     summary: Create a new site
+ *     tags: [Admin — Sites]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Addis Ababa Hub
+ *               address:
+ *                 type: string
+ *                 example: Bole Road, Addis Ababa, Ethiopia
+ *               description:
+ *                 type: string
+ *                 example: Main training center
+ *     responses:
+ *       201:
+ *         description: Site created successfully
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.post('/sites', siteValidator.create, validate, siteController.createSite);
+
+/**
+ * @swagger
+ * /api/admin/sites/{id}:
+ *   put:
+ *     summary: Update a site
+ *     tags: [Admin — Sites]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Site updated successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.put('/sites/:id', siteValidator.siteIdParam, siteValidator.update, validate, siteController.updateSite);
+
+/**
+ * @swagger
+ * /api/admin/sites/{id}/toggle-status:
+ *   patch:
+ *     summary: Toggle site active/inactive
+ *     tags: [Admin — Sites]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Site status toggled
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ */
+router.patch('/sites/:id/toggle-status', siteValidator.siteIdParam, validate, siteController.toggleSiteStatus);
+
+/**
+ * @swagger
+ * /api/admin/announcements:
+ *   post:
+ *     summary: Broadcast an announcement to all students
+ *     tags: [Admin — Announcements]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title: { type: string, example: "Platform Maintenance" }
+ *               message: { type: string, example: "System maintenance tonight at 12:00 AM UTC." }
+ *     responses:
+ *       201:
+ *         description: Announcement broadcasted successfully
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ */
+router.post('/announcements', notificationValidator.announcementBody, validate, notificationController.createAnnouncement);
+
+// ── Admin CSV Exports ──────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/export/students:
+ *   get:
+ *     summary: Export students to CSV
+ *     tags: [Admin — CSV Export]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CSV file stream returned
+ *         content:
+ *           text/csv:
+ *             schema: { type: string, format: binary }
+ */
+router.get('/export/students', exportController.exportStudents);
+
+/**
+ * @swagger
+ * /api/admin/export/enrollments:
+ *   get:
+ *     summary: Export course enrollments to CSV
+ *     tags: [Admin — CSV Export]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CSV file stream returned
+ *         content:
+ *           text/csv:
+ *             schema: { type: string, format: binary }
+ */
+router.get('/export/enrollments', exportController.exportEnrollments);
+
+/**
+ * @swagger
+ * /api/admin/export/competition-registrations:
+ *   get:
+ *     summary: Export competition registrations to CSV
+ *     tags: [Admin — CSV Export]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CSV file stream returned
+ *         content:
+ *           text/csv:
+ *             schema: { type: string, format: binary }
+ */
+router.get('/export/competition-registrations', exportController.exportCompetitionRegistrations);
+
+/**
+ * @swagger
+ * /api/admin/export/courses:
+ *   get:
+ *     summary: Export course data to CSV
+ *     tags: [Admin — CSV Export]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: CSV file stream returned
+ *         content:
+ *           text/csv:
+ *             schema: { type: string, format: binary }
+ */
+router.get('/export/courses', exportController.exportCourses);
+
+// ── Admin Digital Certificates ─────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/certificates:
+ *   post:
+ *     summary: Issue a digital certificate to a student
+ *     tags: [Admin — Certificates]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [studentId, type, title]
+ *             properties:
+ *               studentId: { type: string }
+ *               type: { type: string, enum: [course_completion, competition_achievement, hackathon_winner, special_recognition] }
+ *               title: { type: string, example: "Certificate of Completion - Python Programming" }
+ *               courseId: { type: string }
+ *               competitionId: { type: string }
+ *               gradeOrRank: { type: string, example: "Distinction" }
+ *     responses:
+ *       201:
+ *         description: Certificate issued successfully
+ *       409:
+ *         description: Certificate already issued
+ */
+router.post('/certificates', certificateValidator.issueBody, validate, certificateController.issueCertificate);
+
+/**
+ * @swagger
+ * /api/admin/certificates:
+ *   get:
+ *     summary: List all issued certificates
+ *     tags: [Admin — Certificates]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [valid, revoked] }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Certificates fetched successfully
+ */
+router.get('/certificates', certificateValidator.adminListQuery, validate, certificateController.getAllCertificates);
+
+/**
+ * @swagger
+ * /api/admin/certificates/{id}/revoke:
+ *   patch:
+ *     summary: Revoke an issued certificate
+ *     tags: [Admin — Certificates]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Certificate revoked successfully
+ */
+router.patch('/certificates/:id/revoke', certificateValidator.certificateIdParam, validate, certificateController.revokeCertificate);
+
+// ── Admin Course Resources Management ──────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/courses/{courseId}/resources:
+ *   post:
+ *     summary: Add learning resource to course
+ *     tags: [Admin — Resources]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, type, url]
+ *             properties:
+ *               title: { type: string, example: "Syllabus PDF" }
+ *               description: { type: string }
+ *               type: { type: string, enum: [pdf, video, external_link, document, github_repo, other] }
+ *               url: { type: string, example: "https://example.com/syllabus.pdf" }
+ *               position: { type: integer, example: 1 }
+ *     responses:
+ *       201:
+ *         description: Resource added successfully
+ */
+router.post('/courses/:courseId/resources', resourceValidator.createResource, validate, resourceController.addResource);
+
+/**
+ * @swagger
+ * /api/admin/courses/{courseId}/resources/{resourceId}:
+ *   put:
+ *     summary: Update course learning resource
+ *     tags: [Admin — Resources]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: resourceId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Resource updated successfully
+ */
+router.put('/courses/:courseId/resources/:resourceId', resourceValidator.updateResource, validate, resourceController.updateResource);
+
+/**
+ * @swagger
+ * /api/admin/courses/{courseId}/resources/{resourceId}:
+ *   delete:
+ *     summary: Delete course learning resource
+ *     tags: [Admin — Resources]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: resourceId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Resource deleted successfully
+ */
+router.delete('/courses/:courseId/resources/:resourceId', resourceValidator.resourceIdParams, validate, resourceController.deleteResource);
+
+/**
+ * @swagger
+ * /api/admin/courses/{courseId}/resources/reorder:
+ *   patch:
+ *     summary: Reorder resource positions in course
+ *     tags: [Admin — Resources]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: courseId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [resourceOrders]
+ *             properties:
+ *               resourceOrders:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     resourceId: { type: string }
+ *                     position: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Resource positions reordered
+ */
+router.patch('/courses/:courseId/resources/reorder', resourceValidator.courseIdParam, validate, resourceController.reorderResources);
+
 module.exports = router;
+
 

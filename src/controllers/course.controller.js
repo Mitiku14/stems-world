@@ -24,7 +24,7 @@ exports.getCourses = asyncHandler(async (req, res) => {
 
   const [courses, total] = await Promise.all([
     Course.find(filter)
-      .select('title description category level requiresDocument imageUrl isActive createdAt')
+      .select('title description category level requiresDocument imageUrl syllabus instructor duration requirements registrationOpenDate registrationCloseDate season maxStudents isActive createdAt')
       .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)
@@ -45,7 +45,12 @@ exports.getCourse = asyncHandler(async (req, res) => {
 });
 
 exports.createCourse = asyncHandler(async (req, res) => {
-  const { title, description, category, level, requiresDocument, imageUrl } = req.body;
+  const {
+    title, description, category, level, requiresDocument, imageUrl,
+    syllabus, instructor, duration, requirements,
+    registrationOpenDate, registrationCloseDate, season, maxStudents, sites,
+  } = req.body;
+
   const course = await Course.create({
     title,
     description,
@@ -53,18 +58,52 @@ exports.createCourse = asyncHandler(async (req, res) => {
     level,
     requiresDocument: requiresDocument ?? false,
     imageUrl: imageUrl || null,
+    syllabus: syllabus || [],
+    instructor: instructor || null,
+    duration: duration || null,
+    requirements: requirements || [],
+    registrationOpenDate: registrationOpenDate || null,
+    registrationCloseDate: registrationCloseDate || null,
+    season: season || null,
+    maxStudents: maxStudents || null,
+    sites: sites || [],
     createdBy: req.user._id,
   });
+
   return res.status(201).json(new ApiResponse(201, 'Course created successfully.', course));
 });
 
 exports.updateCourse = asyncHandler(async (req, res) => {
-  const { title, description, category, level, requiresDocument, imageUrl } = req.body;
+  const {
+    title, description, category, level, requiresDocument, imageUrl,
+    syllabus, instructor, duration, requirements,
+    registrationOpenDate, registrationCloseDate, season, maxStudents, sites,
+  } = req.body;
+
+  // Build update object — only include fields that were explicitly sent
+  const updates = {};
+  if (title !== undefined)               updates.title = title;
+  if (description !== undefined)         updates.description = description;
+  if (category !== undefined)            updates.category = category;
+  if (level !== undefined)               updates.level = level;
+  if (requiresDocument !== undefined)    updates.requiresDocument = requiresDocument;
+  if (imageUrl !== undefined)            updates.imageUrl = imageUrl || null;
+  if (syllabus !== undefined)            updates.syllabus = syllabus;
+  if (instructor !== undefined)          updates.instructor = instructor || null;
+  if (duration !== undefined)            updates.duration = duration || null;
+  if (requirements !== undefined)        updates.requirements = requirements;
+  if (registrationOpenDate !== undefined) updates.registrationOpenDate = registrationOpenDate || null;
+  if (registrationCloseDate !== undefined) updates.registrationCloseDate = registrationCloseDate || null;
+  if (season !== undefined)              updates.season = season || null;
+  if (maxStudents !== undefined)         updates.maxStudents = maxStudents || null;
+  if (sites !== undefined)               updates.sites = sites;
+
   const course = await Course.findByIdAndUpdate(
     req.params.id,
-    { title, description, category, level, requiresDocument, imageUrl: imageUrl !== undefined ? (imageUrl || null) : undefined },
+    updates,
     { new: true, runValidators: true }
   );
+
   if (!course) throw new ApiError(404, 'Course not found.');
   return res.json(new ApiResponse(200, 'Course updated successfully.', course));
 });

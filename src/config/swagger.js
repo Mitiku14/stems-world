@@ -163,6 +163,56 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
               example: '/cs/programming.jpg',
               description: 'Optional image URL for the course card (external URL or relative path)',
             },
+            syllabus: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Variables & Data Types', 'Control Flow', 'Functions'],
+              description: 'List of topics/skills covered in the course',
+            },
+            instructor: {
+              type: 'string',
+              nullable: true,
+              example: 'Dr. Abebe Tessema',
+              description: 'Instructor name',
+            },
+            duration: {
+              type: 'string',
+              nullable: true,
+              example: '12 weeks',
+              description: 'Course duration',
+            },
+            requirements: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Basic Python programming', 'English proficiency'],
+              description: 'Prerequisites for the course',
+            },
+            registrationOpenDate: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-09-01T00:00:00.000Z',
+              description: 'When enrollment opens (null = always open)',
+            },
+            registrationCloseDate: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-10-01T00:00:00.000Z',
+              description: 'When enrollment closes (null = no deadline)',
+            },
+            season: {
+              type: 'string',
+              nullable: true,
+              example: 'Fall 2026',
+              description: 'Intake label',
+            },
+            maxStudents: {
+              type: 'integer',
+              nullable: true,
+              example: 30,
+              description: 'Maximum enrollment capacity (null = unlimited)',
+            },
             isActive: { type: 'boolean', example: true },
             createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
           },
@@ -178,6 +228,8 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             email: { type: 'string', example: 'john@example.com' },
             courseType: { type: 'string', example: 'Introduction to Machine Learning' },
             academicFileName: { type: 'string', nullable: true, example: 'a1b2c3d4.pdf' },
+            grade: { type: 'string', nullable: true, example: '10th Grade' },
+            siteName: { type: 'string', nullable: true, example: 'Addis Ababa Hub' },
             status: {
               type: 'string',
               enum: ['pending', 'accepted', 'rejected'],
@@ -204,6 +256,104 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
                 rejected: { type: 'integer', example: 10 },
               },
             },
+          },
+        },
+
+        // ── Site ─────────────────────────────────────────────────────────────
+        Site: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            name: { type: 'string', example: 'Addis Ababa Hub' },
+            address: { type: 'string', nullable: true, example: 'Bole Road, Addis Ababa, Ethiopia' },
+            description: { type: 'string', nullable: true, example: 'Main training center' },
+            isActive: { type: 'boolean', example: true },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        // ── Competition ──────────────────────────────────────────────────────
+        Competition: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', example: 'National Coding Hackathon' },
+            description: { type: 'string', example: 'Annual hackathon for schools.' },
+            type: { type: 'string', enum: ['competition', 'hackathon', 'workshop', 'training', 'event'] },
+            scope: { type: 'string', enum: ['local', 'national', 'international'] },
+            registrationOpenDate: { type: 'string', format: 'date-time' },
+            registrationCloseDate: { type: 'string', format: 'date-time' },
+            eventStartDate: { type: 'string', format: 'date-time' },
+            eventEndDate: { type: 'string', format: 'date-time' },
+            location: { type: 'string', example: 'Main Campus' },
+            eligibility: { type: 'string', example: 'Open to all high school students' },
+            requirements: { type: 'array', items: { type: 'string' } },
+            maxParticipants: { type: 'integer', example: 100 },
+            status: { type: 'string', enum: ['draft', 'upcoming', 'open', 'closed', 'completed', 'cancelled'] },
+            organizer: { type: 'string', example: 'AfriSTEAM' },
+            contactEmail: { type: 'string', example: 'support@afristeam.com' },
+          },
+        },
+
+        // ── Competition Registration ─────────────────────────────────────────
+        CompetitionRegistration: {
+          type: 'object',
+          properties: {
+            competition: { type: 'string', example: '64a1b2...' },
+            student: { type: 'string', nullable: true, example: '64a1b2...' },
+            fullName: { type: 'string', example: 'Jane Doe' },
+            email: { type: 'string', example: 'jane@example.com' },
+            phone: { type: 'string', example: '+1234567890' },
+            grade: { type: 'string', example: '11th Grade' },
+            school: { type: 'string', example: 'Central High School' },
+            skills: { type: 'array', items: { type: 'string' } },
+            motivation: { type: 'string', example: 'I love coding!' },
+            teamName: { type: 'string', example: 'Code Ninjas' },
+            teamMembers: { type: 'array', items: { type: 'string' } },
+            status: { type: 'string', enum: ['pending', 'accepted', 'rejected'] },
+          },
+        },
+
+        // ── Notification ───────────────────────────────────────────────────
+        Notification: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            title: { type: 'string', example: 'Enrollment Approved!' },
+            message: { type: 'string', example: 'Your enrollment in CS 101 was accepted.' },
+            type: { type: 'string', enum: ['enrollment_submitted', 'enrollment_approved', 'enrollment_rejected', 'competition_submitted', 'competition_approved', 'competition_rejected', 'announcement', 'general'] },
+            isRead: { type: 'boolean', example: false },
+            relatedResource: { type: 'string', nullable: true, example: '64a1b2c3d4e5f6789012abcd' },
+            relatedResourceType: { type: 'string', nullable: true, example: 'Enrollment' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        // ── Certificate ────────────────────────────────────────────────────
+        Certificate: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            certificateNumber: { type: 'string', example: 'CERT-2026-A1B2C3D4' },
+            title: { type: 'string', example: 'Certificate of Completion - Python Programming' },
+            type: { type: 'string', enum: ['course_completion', 'competition_achievement', 'hackathon_winner', 'special_recognition'] },
+            studentName: { type: 'string', example: 'John Doe' },
+            gradeOrRank: { type: 'string', nullable: true, example: 'Distinction' },
+            status: { type: 'string', enum: ['valid', 'revoked'], example: 'valid' },
+            issueDate: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        // ── Course Resource ────────────────────────────────────────────────
+        CourseResource: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            title: { type: 'string', example: 'Course Syllabus PDF' },
+            description: { type: 'string', example: 'Downloadable syllabus document' },
+            type: { type: 'string', enum: ['pdf', 'video', 'external_link', 'document', 'github_repo', 'other'], example: 'pdf' },
+            url: { type: 'string', example: 'https://example.com/syllabus.pdf' },
+            position: { type: 'integer', example: 1 },
+            isActive: { type: 'boolean', example: true },
           },
         },
       },
@@ -292,9 +442,20 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
       { name: 'Courses',             description: 'Browse and manage courses' },
       { name: 'Enrollments',         description: 'Student enrollment submission and status tracking' },
       { name: 'Contact',             description: 'Public contact / feedback form' },
+      { name: 'Notifications',       description: 'In-app notification management for students' },
+      { name: 'Certificates',        description: 'Student certificate retrieval and public verification' },
       { name: 'Admin — Dashboard',   description: 'Admin overview statistics and feedback' },
       { name: 'Admin — Enrollments', description: 'Admin enrollment review (accept / reject)' },
+      { name: 'Admin — Courses',     description: 'Admin course management' },
       { name: 'Admin — Students',    description: 'Admin student account management' },
+      { name: 'Admin — Announcements', description: 'Admin system announcements broadcast' },
+      { name: 'Admin — CSV Export',  description: 'Admin CSV data reporting and exports' },
+      { name: 'Admin — Certificates', description: 'Admin certificate issuance and revocation' },
+      { name: 'Admin — Resources',   description: 'Admin course resource management' },
+      { name: 'Sites',                description: 'Physical training locations' },
+      { name: 'Admin — Sites',        description: 'Admin site/location management' },
+      { name: 'Competitions',         description: 'Public competition endpoints' },
+      { name: 'Admin — Competitions', description: 'Admin competition management and registration review' },
     ],
   },
 
@@ -305,6 +466,10 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     './src/routes/enrollment.routes.js',
     './src/routes/admin.routes.js',
     './src/routes/contact.routes.js',
+    './src/routes/site.routes.js',
+    './src/routes/competition.routes.js',
+    './src/routes/notification.routes.js',
+    './src/routes/certificate.routes.js',
   ],
 };
 

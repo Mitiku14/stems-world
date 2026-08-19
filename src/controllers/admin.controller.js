@@ -1,12 +1,14 @@
 const User       = require('../models/User');
 const Course     = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
-
+const Competition = require('../models/Competition');
+const CompetitionRegistration = require('../models/CompetitionRegistration');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { ROLES, ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
+const notificationService = require('../services/notification.service');
 
 const paginate = (total, page, limit) => ({
   total,
@@ -25,6 +27,8 @@ const flattenEnrollment = (e) => ({
   email:             e.student?.email || e.studentEmail || '—',
   courseType:        e.course?.title  || '—',
   academicFileName:  e.academicPdf    || null,
+  grade:             e.grade          || null,
+  siteName:          e.site?.name     || null,
   status:            e.status,
   registeredAt:      e.createdAt,
   rejectionReason:   e.rejectionReason || null,
@@ -36,28 +40,81 @@ const flattenEnrollment = (e) => ({
 exports.getDashboard = asyncHandler(async (_req, res) => {
   const [
     totalStudents,
+    activeStudents,
     totalCourses,
+    activeCourses,
     totalEnrollments,
     pendingEnrollments,
     acceptedEnrollments,
     rejectedEnrollments,
+    totalCompetitions,
+    activeCompetitions,
+    totalCompRegistrations,
+    pendingCompRegistrations,
+    approvedCompRegistrations,
+    rejectedCompRegistrations,
+    enrollmentsByCourse,
+    enrollmentsBySite,
+    enrollmentsByStatus,
   ] = await Promise.all([
     User.countDocuments({ role: ROLES.STUDENT }),
+    User.countDocuments({ role: ROLES.STUDENT, isActive: true }),
     Course.countDocuments(),
+    Course.countDocuments({ isActive: true }),
     Enrollment.countDocuments(),
     Enrollment.countDocuments({ status: ENROLLMENT_STATUS.PENDING }),
     Enrollment.countDocuments({ status: ENROLLMENT_STATUS.ACCEPTED }),
     Enrollment.countDocuments({ status: ENROLLMENT_STATUS.REJECTED }),
+    Competition.countDocuments(),
+    Competition.countDocuments({ isActive: true, status: { $in: ['open', 'upcoming'] } }),
+    CompetitionRegistration.countDocuments(),
+    CompetitionRegistration.countDocuments({ status: ENROLLMENT_STATUS.PENDING }),
+    CompetitionRegistration.countDocuments({ status: ENROLLMENT_STATUS.ACCEPTED }),
+    CompetitionRegistration.countDocuments({ status: ENROLLMENT_STATUS.REJECTED }),
+    Enrollment.aggregate([
+      { $group: { _id: '$course', count: { $sum: 1 } } },
+      { $lookup: { from: 'courses', localField: '_id', foreignField: '_id', as: 'course' } },
+      { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
+      { $project: { _id: 1, title: '$course.title', count: 1 } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]),
+    Enrollment.aggregate([
+      { $match: { site: { $ne: null } } },
+      { $group: { _id: '$site', count: { $sum: 1 } } },
+      { $lookup: { from: 'sites', localField: '_id', foreignField: '_id', as: 'site' } },
+      { $unwind: { path: '$site', preserveNullAndEmptyArrays: true } },
+      { $project: { _id: 1, name: '$site.name', count: 1 } },
+      { $sort: { count: -1 } },
+    ]),
+    Enrollment.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
   ]);
 
   return res.json(new ApiResponse(200, 'Dashboard stats fetched successfully.', {
     totalStudents,
+    activeStudents,
     totalCourses,
+    activeCourses,
     enrollments: {
       total:    totalEnrollments,
       pending:  pendingEnrollments,
       accepted: acceptedEnrollments,
       rejected: rejectedEnrollments,
+      byCourse: enrollmentsByCourse,
+      bySite:   enrollmentsBySite,
+      byStatus: enrollmentsByStatus.reduce((acc, curr) => ({ ...acc, [curr._id]: curr.count }), {}),
+    },
+    competitions: {
+      total: totalCompetitions,
+      active: activeCompetitions,
+      registrations: {
+        total: totalCompRegistrations,
+        pending: pendingCompRegistrations,
+        approved: approvedCompRegistrations,
+        rejected: rejectedCompRegistrations,
+      },
     },
   }));
 });
@@ -95,6 +152,7 @@ exports.getAllEnrollments = asyncHandler(async (req, res) => {
     Enrollment.find(filter)
       .populate('student',    'name email')
       .populate('course',     'title category')
+      .populate('site',       'name')
       .populate('reviewedBy', 'name email')
       .sort({ createdAt: -1 })
       .skip((p - 1) * l)
@@ -113,6 +171,7 @@ exports.getEnrollmentById = asyncHandler(async (req, res) => {
   const enrollment = await Enrollment.findById(req.params.id)
     .populate('student',    'name email phone')
     .populate('course',     'title description category level requiresDocument')
+    .populate('site',       'name')
     .populate('reviewedBy', 'name email')
     .lean();
 
@@ -146,6 +205,26 @@ exports.approveEnrollment = asyncHandler(async (req, res) => {
       { name: recipientName, email: recipientEmail },
       enrollment.course
     );
+  }
+
+  // In-app notification
+  if (enrollment.student?._id) {
+    notificationService.createNotification({
+      recipient: enrollment.student._id,
+      title: 'Course Enrollment Approved! 🎉',
+      message: `Your enrollment for "${enrollment.course.title}" has been approved.`,
+      type: 'enrollment_approved',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
+  } else if (recipientEmail) {
+    notificationService.notifyUserByEmail(recipientEmail, {
+      title: 'Course Enrollment Approved! 🎉',
+      message: `Your enrollment for "${enrollment.course.title}" has been approved.`,
+      type: 'enrollment_approved',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
   }
 
   return res.json(new ApiResponse(200, 'Enrollment accepted successfully.', {
@@ -183,6 +262,26 @@ exports.rejectEnrollment = asyncHandler(async (req, res) => {
       enrollment.course,
       rejectionReason || 'No reason provided.'
     );
+  }
+
+  // In-app notification
+  if (enrollment.student?._id) {
+    notificationService.createNotification({
+      recipient: enrollment.student._id,
+      title: 'Course Enrollment Status Update',
+      message: `Your enrollment for "${enrollment.course.title}" was not approved. ${rejectionReason ? `Reason: ${rejectionReason}` : ''}`,
+      type: 'enrollment_rejected',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
+  } else if (recipientEmail) {
+    notificationService.notifyUserByEmail(recipientEmail, {
+      title: 'Course Enrollment Status Update',
+      message: `Your enrollment for "${enrollment.course.title}" was not approved. ${rejectionReason ? `Reason: ${rejectionReason}` : ''}`,
+      type: 'enrollment_rejected',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
   }
 
   return res.json(new ApiResponse(200, 'Enrollment rejected successfully.', {
@@ -289,5 +388,33 @@ exports.createAdmin = asyncHandler(async (req, res) => {
     username: user.username,
     email: user.email,
     role: user.role,
+  }));
+});
+
+// ── Course Management ──────────────────────────────────────────────────────
+
+exports.getAllCourses = asyncHandler(async (req, res) => {
+  const { search, category, level, page = 1, limit = 10 } = req.query;
+  const p = Number(page);
+  const l = Number(limit);
+
+  const filter = {};  // No isActive filter — admin sees everything
+  if (category) filter.category = category;
+  if (level) filter.level = level;
+  if (search) filter.$text = { $search: search };
+
+  const [courses, total] = await Promise.all([
+    Course.find(filter)
+      .select('title description category level requiresDocument imageUrl isActive frontendId instructor duration season maxStudents createdAt')
+      .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
+      .skip((p - 1) * l)
+      .limit(l)
+      .lean(),
+    Course.countDocuments(filter),
+  ]);
+
+  return res.json(new ApiResponse(200, 'Courses fetched successfully.', {
+    courses,
+    pagination: paginate(total, p, l),
   }));
 });

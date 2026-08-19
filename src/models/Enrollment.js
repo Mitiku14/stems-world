@@ -36,6 +36,21 @@ const enrollmentSchema = new mongoose.Schema(
       default: ENROLLMENT_STATUS.PENDING,
     },
 
+    // Student's current grade/class level
+    grade: {
+      type: String,
+      trim: true,
+      default: null,
+      maxlength: [20, 'Grade cannot exceed 20 characters'],
+    },
+
+    // Which site the student selected for in-person classes
+    site: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Site',
+      default: null,
+    },
+
     academicPdf: {
       type: String,
       default: null,
@@ -64,6 +79,5 @@ const enrollmentSchema = new mongoose.Schema(
 enrollmentSchema.index({ student: 1, course: 1, status: 1 });
 enrollmentSchema.index({ studentEmail: 1, course: 1, status: 1 });
 enrollmentSchema.index({ status: 1, createdAt: -1 });
-enrollmentSchema.index({ student: 1, course: 1 });
 
 module.exports = mongoose.model('Enrollment', enrollmentSchema);

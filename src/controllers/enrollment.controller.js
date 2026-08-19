@@ -5,6 +5,7 @@ const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
+const notificationService = require('../services/notification.service');
 const mongoose = require('mongoose');
 
 /**
@@ -37,18 +38,47 @@ const resolveCourse = async (courseType) => {
  * courseType can be a frontendId like "cs-1", "math-3", or a course title.
  */
 exports.submitEnrollment = asyncHandler(async (req, res) => {
-  const { studentName, email, courseType, academicPdf } = req.body;
+  const { studentName, email, courseType, academicPdf, grade, site } = req.body;
 
   const course = await resolveCourse(courseType);
   if (!course) throw new ApiError(404, 'Course not found or is no longer available.');
 
-  // Prevent duplicate pending/accepted submissions for the same email + course
-  const existing = await Enrollment.findOne({
-    studentEmail: email.toLowerCase().trim(),
+  // ── Registration window check ──
+  const now = new Date();
+  if (course.registrationOpenDate && now < course.registrationOpenDate) {
+    throw new ApiError(400, `Registration for this course opens on ${course.registrationOpenDate.toISOString().split('T')[0]}.`);
+  }
+  if (course.registrationCloseDate && now > course.registrationCloseDate) {
+    throw new ApiError(400, 'Registration for this course has closed.');
+  }
+
+  // ── Max capacity check ──
+  if (course.maxStudents) {
+    const acceptedCount = await Enrollment.countDocuments({
+      course: course._id,
+      status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED] },
+    });
+    if (acceptedCount >= course.maxStudents) {
+      throw new ApiError(400, 'This course has reached its maximum enrollment capacity.');
+    }
+  }
+
+  // ── Determine student identity ──
+  const enrollmentEmail = req.user ? req.user.email : email.toLowerCase().trim();
+  const enrollmentName = req.user ? req.user.name : studentName;
+
+  // ── Duplicate check ──
+  const duplicateFilter = {
     course: course._id,
     status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED] },
-  });
+  };
+  if (req.user) {
+    duplicateFilter.student = req.user._id;
+  } else {
+    duplicateFilter.studentEmail = enrollmentEmail;
+  }
 
+  const existing = await Enrollment.findOne(duplicateFilter);
   if (existing) {
     const msg = existing.status === ENROLLMENT_STATUS.PENDING
       ? 'You already have a pending enrollment for this course.'
@@ -56,26 +86,61 @@ exports.submitEnrollment = asyncHandler(async (req, res) => {
     throw new ApiError(409, msg);
   }
 
+  // ── Site validation ──
+  if (site) {
+    const Site = require('../models/Site');
+    const siteDoc = await Site.findOne({ _id: site, isActive: true });
+    if (!siteDoc) throw new ApiError(400, 'Selected site is not available.');
+  }
+
+  // ── Document check ──
   if (course.requiresDocument && !academicPdf) {
     throw new ApiError(400, 'An academic PDF public URL is required to enroll in this course.');
   }
 
+  // ── Create enrollment ──
   const enrollment = await Enrollment.create({
-    studentName,
-    studentEmail: email.toLowerCase().trim(),
+    student: req.user ? req.user._id : null,
+    studentName: enrollmentName,
+    studentEmail: enrollmentEmail,
     course: course._id,
     academicPdf: academicPdf || null,
+    grade: grade || null,
+    site: site || null,
   });
 
-  // Confirmation email — fire and forget
-  emailService.sendEnrollmentSubmittedEmail({ name: studentName, email }, course);
+  // Confirmation email
+  emailService.sendEnrollmentSubmittedEmail(
+    { name: enrollmentName, email: enrollmentEmail },
+    course
+  );
+
+  // In-app notification
+  if (req.user) {
+    notificationService.createNotification({
+      recipient: req.user._id,
+      title: 'Course Enrollment Submitted',
+      message: `Your enrollment request for "${course.title}" has been submitted.`,
+      type: 'enrollment_submitted',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
+  } else if (enrollmentEmail) {
+    notificationService.notifyUserByEmail(enrollmentEmail, {
+      title: 'Course Enrollment Submitted',
+      message: `Your enrollment request for "${course.title}" has been submitted.`,
+      type: 'enrollment_submitted',
+      relatedResource: enrollment._id,
+      relatedResourceType: 'Enrollment',
+    });
+  }
 
   return res.status(201).json(
     new ApiResponse(201, 'Enrollment submitted successfully. You will be notified once it has been reviewed.', {
-      id:          enrollment._id,
-      studentName: enrollment.studentName,
-      course:      { id: course._id, title: course.title },
-      status:      enrollment.status,
+      id: enrollment._id,
+      studentName: enrollmentName,
+      course: { id: course._id, title: course.title },
+      status: enrollment.status,
       submittedAt: enrollment.createdAt,
     })
   );

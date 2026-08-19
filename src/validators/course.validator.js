@@ -38,6 +38,33 @@ const create = [
         throw new Error('imageUrl must be a valid URL or relative path starting with /');
       }
     }),
+
+  body('syllabus').optional().isArray().withMessage('Syllabus must be an array'),
+  body('syllabus.*').isString().trim().notEmpty().withMessage('Each syllabus item must be a non-empty string'),
+
+  body('instructor').optional({ nullable: true }).trim()
+    .isLength({ max: 100 }).withMessage('Instructor name cannot exceed 100 characters'),
+
+  body('duration').optional({ nullable: true }).trim()
+    .isLength({ max: 50 }).withMessage('Duration cannot exceed 50 characters'),
+
+  body('requirements').optional().isArray().withMessage('Requirements must be an array'),
+  body('requirements.*').isString().trim().notEmpty().withMessage('Each requirement must be a non-empty string'),
+
+  body('registrationOpenDate').optional({ nullable: true })
+    .isISO8601().withMessage('registrationOpenDate must be a valid ISO 8601 date'),
+
+  body('registrationCloseDate').optional({ nullable: true })
+    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date'),
+
+  body('season').optional({ nullable: true }).trim()
+    .isLength({ max: 50 }).withMessage('Season cannot exceed 50 characters'),
+
+  body('maxStudents').optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('maxStudents must be an integer ≥ 1'),
+
+  body('sites').optional().isArray().withMessage('Sites must be an array'),
+  body('sites.*').isMongoId().withMessage('Each site must be a valid MongoDB ID'),
 ];
 
 const update = [
@@ -76,6 +103,33 @@ const update = [
         throw new Error('imageUrl must be a valid URL or relative path starting with /');
       }
     }),
+
+  body('syllabus').optional().isArray().withMessage('Syllabus must be an array'),
+  body('syllabus.*').isString().trim().notEmpty().withMessage('Each syllabus item must be a non-empty string'),
+
+  body('instructor').optional({ nullable: true }).trim()
+    .isLength({ max: 100 }).withMessage('Instructor name cannot exceed 100 characters'),
+
+  body('duration').optional({ nullable: true }).trim()
+    .isLength({ max: 50 }).withMessage('Duration cannot exceed 50 characters'),
+
+  body('requirements').optional().isArray().withMessage('Requirements must be an array'),
+  body('requirements.*').isString().trim().notEmpty().withMessage('Each requirement must be a non-empty string'),
+
+  body('registrationOpenDate').optional({ nullable: true })
+    .isISO8601().withMessage('registrationOpenDate must be a valid ISO 8601 date'),
+
+  body('registrationCloseDate').optional({ nullable: true })
+    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date'),
+
+  body('season').optional({ nullable: true }).trim()
+    .isLength({ max: 50 }).withMessage('Season cannot exceed 50 characters'),
+
+  body('maxStudents').optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('maxStudents must be an integer ≥ 1'),
+
+  body('sites').optional().isArray().withMessage('Sites must be an array'),
+  body('sites.*').isMongoId().withMessage('Each site must be a valid MongoDB ID'),
 ];
 
 const courseIdParam = [

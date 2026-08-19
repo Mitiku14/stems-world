@@ -12,10 +12,10 @@ const { ROLES }            = require('../constants');
  * @swagger
  * /api/enrollments:
  *   post:
- *     summary: Submit a course enrollment (public)
+ *     summary: Submit a course enrollment
  *     description: >
- *       Submits an enrollment request for a course. **No authentication required.**
- *       The frontend form is shown to anonymous visitors.
+ *       Submits an enrollment request for a course. **Authentication is optional.**
+ *       If authenticated, the enrollment is linked to the user's account.
  *
  *       `courseType` can be:
  *       - A frontend ID like `"cs-1"`, `"math-3"`, `"english-1"`
@@ -24,6 +24,8 @@ const { ROLES }            = require('../constants');
  *
  *       Request must use `application/json`.
  *     tags: [Enrollments]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -47,11 +49,19 @@ const { ROLES }            = require('../constants');
  *                 type: string
  *                 format: uri
  *                 description: Public URL to the academic PDF. Required if requiresDocument=true.
+ *               grade:
+ *                 type: string
+ *                 example: "12"
+ *                 description: Student's current grade or class level
+ *               site:
+ *                 type: string
+ *                 example: 64a1b2c3...
+ *                 description: ObjectId of the selected physical training site
  *     responses:
  *       201:
  *         description: Enrollment submitted successfully
  *       400:
- *         description: PDF required but not provided
+ *         description: PDF required, invalid site, or registration window closed
  *       404:
  *         description: Course not found
  *       409:
@@ -59,8 +69,21 @@ const { ROLES }            = require('../constants');
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */
+
+// Optional auth — sets req.user if token is present, but doesn't block anonymous users
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return next();
+  // Delegate to verifyToken; if it fails, proceed without auth
+  verifyToken(req, res, (err) => {
+    if (err) return next(); // Silently continue as anonymous
+    next();
+  });
+};
+
 router.post(
   '/',
+  optionalAuth,
   enrollmentValidator.submit,
   validate,
   enrollmentController.submitEnrollment

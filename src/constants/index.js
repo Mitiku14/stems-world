@@ -27,6 +27,10 @@ const AUTH_PROVIDERS = {
 const COURSE_CATEGORIES = ['programming', 'mathematics', 'language', 'science', 'other'];
 const COURSE_LEVELS     = ['beginner', 'intermediate', 'advanced', 'all'];
 
+const COMPETITION_TYPES = ['competition', 'hackathon', 'workshop', 'training', 'event'];
+const COMPETITION_SCOPES = ['local', 'national', 'international'];
+const COMPETITION_STATUSES = ['draft', 'upcoming', 'open', 'closed', 'completed', 'cancelled'];
+
 module.exports = {
   ROLES,
   ENROLLMENT_STATUS,
@@ -35,4 +39,7 @@ module.exports = {
   AUTH_PROVIDERS,
   COURSE_CATEGORIES,
   COURSE_LEVELS,
+  COMPETITION_TYPES,
+  COMPETITION_SCOPES,
+  COMPETITION_STATUSES,
 };

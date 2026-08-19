@@ -114,6 +114,49 @@ const sendPasswordResetEmail = (user, rawToken) => {
   });
 };
 
+const sendCompetitionRegistrationSubmittedEmail = (user, competition) =>
+  sendEmail({
+    to: user.email,
+    subject: `Competition Registration Submitted — ${competition.title}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <h2>Competition Registration Received</h2>
+        <p>Hi ${user.name},</p>
+        <p>Your registration for <strong>${competition.title}</strong> has been submitted and is <strong>Pending</strong> review.</p>
+        <p>You will be notified once it has been reviewed.</p>
+        <p style="color:#9CA3AF;font-size:12px">AfriSTEAM Competitions</p>
+      </div>`,
+  });
+
+const sendCompetitionRegistrationApprovedEmail = (user, competition) =>
+  sendEmail({
+    to: user.email,
+    subject: `Competition Registration Approved — ${competition?.title || 'Competition'}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <h2>🎉 Registration Approved!</h2>
+        <p>Hi ${user.name},</p>
+        <p>Your registration for <strong>${competition?.title || 'the competition'}</strong> has been <strong>approved</strong>.</p>
+        <p><a href="${env.clientUrl}/competitions/${competition?._id || ''}" style="display:inline-block;padding:12px 24px;background:#10B981;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">View Competition</a></p>
+        <p style="color:#9CA3AF;font-size:12px">AfriSTEAM Competitions</p>
+      </div>`,
+  });
+
+const sendCompetitionRegistrationRejectedEmail = (user, competition, rejectionReason) =>
+  sendEmail({
+    to: user.email,
+    subject: `Competition Registration Update — ${competition?.title || 'Competition'}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+        <h2>Registration Not Approved</h2>
+        <p>Hi ${user.name},</p>
+        <p>Your registration for <strong>${competition?.title || 'the competition'}</strong> was not approved.</p>
+        ${rejectionReason ? `<p><strong>Reason:</strong></p><blockquote style="border-left:4px solid #EF4444;padding-left:12px;color:#374151">${rejectionReason}</blockquote>` : ''}
+        <p><a href="${env.clientUrl}/competitions" style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Browse Competitions</a></p>
+        <p style="color:#9CA3AF;font-size:12px">AfriSTEAM Competitions</p>
+      </div>`,
+  });
+
 module.exports = {
   sendVerificationEmail,
   sendWelcomeEmail,
@@ -121,4 +164,7 @@ module.exports = {
   sendEnrollmentApprovedEmail,
   sendEnrollmentRejectedEmail,
   sendPasswordResetEmail,
+  sendCompetitionRegistrationSubmittedEmail,
+  sendCompetitionRegistrationApprovedEmail,
+  sendCompetitionRegistrationRejectedEmail,
 };

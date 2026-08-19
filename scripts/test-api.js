@@ -452,7 +452,7 @@ const run = async () => {
       });
       if (newEnroll2.status === 201) {
         const r2 = await req('PATCH', `/api/admin/enrollments/${newEnroll2.body.data?.id}/reject`, {}, adminToken);
-        ok('PATCH /reject without reason → 200 (reason is optional)', r2.status === 200, 200, r2.status);
+        ok('PATCH /reject without reason → 422 (rejectionReason is required)', r2.status === 422, 422, r2.status);
       }
     } else {
       console.log(`  ${Y}⚠ Skipping reject tests — could not create fresh enrollment${X}`);

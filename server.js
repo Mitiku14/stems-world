@@ -20,6 +20,10 @@ const courseRoutes     = require('./src/routes/course.routes');
 const enrollmentRoutes = require('./src/routes/enrollment.routes');
 const adminRoutes      = require('./src/routes/admin.routes');
 const contactRoutes    = require('./src/routes/contact.routes');
+const siteRoutes       = require('./src/routes/site.routes');
+const competitionRoutes = require('./src/routes/competition.routes');
+const notificationRoutes = require('./src/routes/notification.routes');
+const certificateRoutes  = require('./src/routes/certificate.routes');
 
 const app = express();
 
@@ -92,8 +96,6 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 
-app.use('/uploads', express.static(path.join(__dirname, 'src/uploads')));
-
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customSiteTitle: 'E-Learning API Docs',
   customCss: '.swagger-ui .topbar { display: none }',
@@ -114,6 +116,10 @@ app.use('/api/courses',     courseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/admin',       adminRoutes);
 app.use('/api/contact',     contactRoutes);
+app.use('/api/sites',       siteRoutes);
+app.use('/api/competitions', competitionRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/certificates',  certificateRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Route not found.' });
@@ -129,9 +135,14 @@ const server = app.listen(env.port, () => {
 
 const shutdown = (signal) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
-  server.close(() => {
+  server.close(async () => {
     const mongoose = require('mongoose');
-    mongoose.connection.close(false, () => process.exit(0));
+    try {
+      await mongoose.connection.close(false);
+    } catch (err) {
+      console.error(err);
+    }
+    process.exit(0);
   });
 };
 
