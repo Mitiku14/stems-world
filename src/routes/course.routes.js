@@ -14,13 +14,6 @@ const { ROLES } = require('../constants');
 // Course Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get('/seed/run', (req, res) => {
-  const { exec } = require('child_process');
-  exec('node seed/course.seed.js', (err, stdout, stderr) => {
-    res.json({ output: stdout, error: stderr, err: err ? err.message : null });
-  });
-});
-
 /**
  * @swagger
  * /api/courses:
