@@ -2,6 +2,36 @@ const { body, query, param } = require('express-validator');
 const mongoose = require('mongoose');
 const { COURSE_CATEGORIES, COURSE_LEVELS } = require('../constants');
 const Course = require('../models/Course');
+const Site = require('../models/Site');
+
+const validateCourseSites = async (sites) => {
+  if (!sites || !Array.isArray(sites) || sites.length === 0) return true;
+
+  const stringIds = sites.map((s) => s.toString());
+  const uniqueSites = new Set(stringIds);
+  if (uniqueSites.size !== sites.length) {
+    throw new Error('Duplicate site IDs are not allowed in the same course');
+  }
+
+  for (const siteId of stringIds) {
+    if (!mongoose.Types.ObjectId.isValid(siteId)) {
+      throw new Error(`Invalid site ID format: ${siteId}`);
+    }
+  }
+
+  const foundSites = await Site.find({
+    _id: { $in: sites },
+    isActive: true,
+  }).select('_id').lean();
+
+  if (foundSites.length !== sites.length) {
+    const foundIds = new Set(foundSites.map((s) => s._id.toString()));
+    const invalidOrInactive = stringIds.filter((id) => !foundIds.has(id));
+    throw new Error(`The following site ID(s) do not exist or are inactive: ${invalidOrInactive.join(', ')}`);
+  }
+
+  return true;
+};
 
 const create = [
   body('title').trim().notEmpty().withMessage('Course title is required')
@@ -74,7 +104,8 @@ const create = [
   body('maxStudents').optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('maxStudents must be an integer ≥ 1'),
 
-  body('sites').optional().isArray().withMessage('Sites must be an array'),
+  body('sites').optional().isArray().withMessage('Sites must be an array')
+    .custom(validateCourseSites),
   body('sites.*').isMongoId().withMessage('Each site must be a valid MongoDB ID'),
 ];
 
@@ -179,7 +210,8 @@ const update = [
   body('maxStudents').optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('maxStudents must be an integer ≥ 1'),
 
-  body('sites').optional().isArray().withMessage('Sites must be an array'),
+  body('sites').optional().isArray().withMessage('Sites must be an array')
+    .custom(validateCourseSites),
   body('sites.*').isMongoId().withMessage('Each site must be a valid MongoDB ID'),
 ];
 

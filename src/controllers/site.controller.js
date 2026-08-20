@@ -37,10 +37,11 @@ exports.getAllSites = asyncHandler(async (req, res) => {
   const l = Number(limit);
 
   const filter = {};
-  if (search) {
+  if (search && search.trim()) {
+    const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     filter.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { address: { $regex: search, $options: 'i' } },
+      { name: { $regex: escaped, $options: 'i' } },
+      { address: { $regex: escaped, $options: 'i' } },
     ];
   }
 
