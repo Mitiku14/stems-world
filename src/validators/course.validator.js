@@ -1,6 +1,7 @@
 const { body, query, param } = require('express-validator');
 const mongoose = require('mongoose');
 const { COURSE_CATEGORIES, COURSE_LEVELS } = require('../constants');
+const Course = require('../models/Course');
 
 const create = [
   body('title').trim().notEmpty().withMessage('Course title is required')
@@ -55,7 +56,17 @@ const create = [
     .isISO8601().withMessage('registrationOpenDate must be a valid ISO 8601 date'),
 
   body('registrationCloseDate').optional({ nullable: true })
-    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date'),
+    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date')
+    .custom((value, { req }) => {
+      if (value && req.body.registrationOpenDate) {
+        const openDate = new Date(req.body.registrationOpenDate);
+        const closeDate = new Date(value);
+        if (!isNaN(openDate.getTime()) && closeDate < openDate) {
+          throw new Error('registrationCloseDate cannot be earlier than registrationOpenDate');
+        }
+      }
+      return true;
+    }),
 
   body('season').optional({ nullable: true }).trim()
     .isLength({ max: 50 }).withMessage('Season cannot exceed 50 characters'),
@@ -117,10 +128,50 @@ const update = [
   body('requirements.*').isString().trim().notEmpty().withMessage('Each requirement must be a non-empty string'),
 
   body('registrationOpenDate').optional({ nullable: true })
-    .isISO8601().withMessage('registrationOpenDate must be a valid ISO 8601 date'),
+    .isISO8601().withMessage('registrationOpenDate must be a valid ISO 8601 date')
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+      let closeDateStr = req.body.registrationCloseDate;
+
+      if (closeDateStr === undefined && req.params?.id && mongoose.Types.ObjectId.isValid(req.params.id)) {
+        const existing = await Course.findById(req.params.id).select('registrationCloseDate').lean();
+        if (existing && existing.registrationCloseDate) {
+          closeDateStr = existing.registrationCloseDate;
+        }
+      }
+
+      if (closeDateStr) {
+        const openDate = new Date(value);
+        const closeDate = new Date(closeDateStr);
+        if (!isNaN(closeDate.getTime()) && closeDate < openDate) {
+          throw new Error('registrationOpenDate cannot be later than registrationCloseDate');
+        }
+      }
+      return true;
+    }),
 
   body('registrationCloseDate').optional({ nullable: true })
-    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date'),
+    .isISO8601().withMessage('registrationCloseDate must be a valid ISO 8601 date')
+    .custom(async (value, { req }) => {
+      if (!value) return true;
+      let openDateStr = req.body.registrationOpenDate;
+
+      if (openDateStr === undefined && req.params?.id && mongoose.Types.ObjectId.isValid(req.params.id)) {
+        const existing = await Course.findById(req.params.id).select('registrationOpenDate').lean();
+        if (existing && existing.registrationOpenDate) {
+          openDateStr = existing.registrationOpenDate;
+        }
+      }
+
+      if (openDateStr) {
+        const openDate = new Date(openDateStr);
+        const closeDate = new Date(value);
+        if (!isNaN(openDate.getTime()) && closeDate < openDate) {
+          throw new Error('registrationCloseDate cannot be earlier than registrationOpenDate');
+        }
+      }
+      return true;
+    }),
 
   body('season').optional({ nullable: true }).trim()
     .isLength({ max: 50 }).withMessage('Season cannot exceed 50 characters'),

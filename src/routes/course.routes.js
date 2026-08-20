@@ -167,6 +167,57 @@ router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, re
  *                 nullable: true
  *                 example: /cs/programming.jpg
  *                 description: Optional image URL for the course card (external URL or relative path)
+ *               syllabus:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ['Variables & Data Types', 'Control Flow', 'Functions']
+ *                 description: List of topics or skills covered
+ *               instructor:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 100
+ *                 example: Dr. Abebe Tessema
+ *                 description: Instructor name
+ *               duration:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 50
+ *                 example: 12 weeks
+ *                 description: Course duration
+ *               requirements:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ['Basic Python programming', 'English proficiency']
+ *                 description: Prerequisites for the course
+ *               registrationOpenDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 example: '2026-09-01T00:00:00.000Z'
+ *                 description: Date when registration opens (null = always open)
+ *               registrationCloseDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *                 example: '2026-10-01T00:00:00.000Z'
+ *                 description: Date when registration closes (null = no deadline)
+ *               season:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 50
+ *                 example: Fall 2026
+ *                 description: Intake label
+ *               maxStudents:
+ *                 type: integer
+ *                 nullable: true
+ *                 minimum: 1
+ *                 example: 30
+ *                 description: Maximum enrollment capacity (null = unlimited)
+ *               sites:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ['64a1b2c3d4e5f6789012abcd']
+ *                 description: Array of MongoDB ObjectIds for training locations
  *     responses:
  *       201:
  *         description: Course created successfully
@@ -239,6 +290,39 @@ router.post(
  *                 type: string
  *                 nullable: true
  *                 example: https://example.com/course-image.jpg
+ *               syllabus:
+ *                 type: array
+ *                 items: { type: string }
+ *               instructor:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 100
+ *               duration:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 50
+ *               requirements:
+ *                 type: array
+ *                 items: { type: string }
+ *               registrationOpenDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               registrationCloseDate:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *               season:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 50
+ *               maxStudents:
+ *                 type: integer
+ *                 nullable: true
+ *                 minimum: 1
+ *               sites:
+ *                 type: array
+ *                 items: { type: string }
  *     responses:
  *       200:
  *         description: Course updated successfully
