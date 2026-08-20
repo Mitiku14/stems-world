@@ -90,7 +90,7 @@ router.post(
 );
 
 // The following routes still require an authenticated student
-router.use(verifyToken, requireRole(ROLES.STUDENT));
+router.use(verifyToken, requireRole(ROLES.STUDENT, ROLES.ADMIN));
 
 /**
  * @swagger
