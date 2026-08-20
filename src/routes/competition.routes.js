@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/role.middleware');
 const { validate } = require('../middleware/validate.middleware');
-const { createCompetitionRules, updateCompetitionRules, competitionIdParam } = require('../validators/competition.validator');
+const { createCompetitionRules, updateCompetitionRules, competitionIdParam, listQuery } = require('../validators/competition.validator');
 const ctrl = require('../controllers/competition.controller');
 
 // ── Public ─────────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ const ctrl = require('../controllers/competition.controller');
  *       200:
  *         description: Competitions fetched successfully
  */
-router.get('/', ctrl.getCompetitions);
+router.get('/', listQuery, validate, ctrl.getCompetitions);
 
 /**
  * @swagger

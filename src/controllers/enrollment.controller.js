@@ -7,6 +7,8 @@ const { ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
 const notificationService = require('../services/notification.service');
 const mongoose = require('mongoose');
+const User = require('../models/User');
+const escapeRegex = require('../utils/escapeRegex');
 
 /**
  * Resolves a course from either:
@@ -26,7 +28,7 @@ const resolveCourse = async (courseType) => {
 
   // Fall back to title match (case-insensitive)
   return Course.findOne({
-    title: { $regex: new RegExp(courseType.replace(/[-_]/g, '.*'), 'i') },
+    title: { $regex: new RegExp(escapeRegex(courseType), 'i') },
     isActive: true,
   });
 };
@@ -42,6 +44,10 @@ exports.submitEnrollment = asyncHandler(async (req, res) => {
 
   const course = await resolveCourse(courseType);
   if (!course) throw new ApiError(404, 'Course not found or is no longer available.');
+
+  if (!req.user && await User.exists({ email })) {
+    throw new ApiError(409, 'An account already exists with this email. Please sign in to enroll.');
+  }
 
   // ── Registration window check ──
   const now = new Date();
@@ -91,6 +97,9 @@ exports.submitEnrollment = asyncHandler(async (req, res) => {
     const Site = require('../models/Site');
     const siteDoc = await Site.findOne({ _id: site, isActive: true });
     if (!siteDoc) throw new ApiError(400, 'Selected site is not available.');
+    if (!(course.sites || []).some((courseSite) => courseSite.toString() === site.toString())) {
+      throw new ApiError(400, 'Selected site is not offered for this course.');
+    }
   }
 
   // ── Document check ──

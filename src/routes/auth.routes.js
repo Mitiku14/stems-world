@@ -38,7 +38,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
  *                 example: john@example.com
  *               password:
  *                 type: string
- *                 minLength: 6
+ *                 minLength: 8
  *                 example: secret123
  *     responses:
  *       201:

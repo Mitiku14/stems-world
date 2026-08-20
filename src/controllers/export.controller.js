@@ -4,6 +4,7 @@ const Enrollment = require('../models/Enrollment');
 const CompetitionRegistration = require('../models/CompetitionRegistration');
 const asyncHandler = require('../utils/asyncHandler');
 const { ROLES } = require('../constants');
+const escapeRegex = require('../utils/escapeRegex');
 
 const formatCSVRow = (values) =>
   values
@@ -48,9 +49,21 @@ exports.exportEnrollments = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
 
   if (search) {
+    const escaped = escapeRegex(search);
+    const students = await User.find({
+      role: ROLES.STUDENT,
+      $or: [
+        { name: { $regex: escaped, $options: 'i' } },
+        { email: { $regex: escaped, $options: 'i' } },
+      ],
+    }).select('_id').lean();
+
+    const studentIds = students.map((u) => u._id);
+
     filter.$or = [
-      { studentName: { $regex: search, $options: 'i' } },
-      { studentEmail: { $regex: search, $options: 'i' } },
+      { student: { $in: studentIds } },
+      { studentName: { $regex: escaped, $options: 'i' } },
+      { studentEmail: { $regex: escaped, $options: 'i' } },
     ];
   }
 

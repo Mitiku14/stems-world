@@ -75,7 +75,7 @@ const broadcastAnnouncement = async ({ title, message, relatedResource = null, r
     return result.length;
   } catch (error) {
     console.error('[NotificationService] Failed to broadcast announcement:', error.message);
-    return 0;
+    throw error;
   }
 };
 

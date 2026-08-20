@@ -2,6 +2,7 @@ const Site = require('../models/Site');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
+const escapeRegex = require('../utils/escapeRegex');
 
 const paginate = (total, page, limit) => ({
   total,
@@ -16,8 +17,17 @@ const paginate = (total, page, limit) => ({
  * GET /api/sites
  * Public — returns active sites only.
  */
-exports.getActiveSites = asyncHandler(async (_req, res) => {
-  const sites = await Site.find({ isActive: true })
+exports.getActiveSites = asyncHandler(async (req, res) => {
+  const filter = { isActive: true };
+  if (req.query.search && req.query.search.trim()) {
+    const escaped = escapeRegex(req.query.search.trim());
+    filter.$or = [
+      { name: { $regex: escaped, $options: 'i' } },
+      { address: { $regex: escaped, $options: 'i' } },
+    ];
+  }
+
+  const sites = await Site.find(filter)
     .select('name address description')
     .sort({ name: 1 })
     .lean();

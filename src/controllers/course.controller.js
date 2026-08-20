@@ -40,7 +40,7 @@ exports.getCourses = asyncHandler(async (req, res) => {
 
 exports.getCourse = asyncHandler(async (req, res) => {
   const course = await Course.findOne({ _id: req.params.id, isActive: true })
-    .populate('sites', 'name address isActive')
+    .populate({ path: 'sites', match: { isActive: true }, select: 'name address isActive' })
     .lean();
   if (!course) throw new ApiError(404, 'Course not found.');
   return res.json(new ApiResponse(200, 'Course fetched successfully.', course));

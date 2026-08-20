@@ -31,6 +31,6 @@ const { validate }   = require('../middleware/validate.middleware');
  *                       items:
  *                         $ref: '#/components/schemas/Site'
  */
-router.get('/', siteController.getActiveSites);
+router.get('/', siteValidator.publicListQuery, validate, siteController.getActiveSites);
 
 module.exports = router;

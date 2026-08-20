@@ -19,6 +19,8 @@ const compRegValidator     = require('../validators/competitionRegistration.vali
 const notificationValidator = require('../validators/notification.validator');
 const certificateValidator = require('../validators/certificate.validator');
 const resourceValidator    = require('../validators/resource.validator');
+const courseValidator      = require('../validators/course.validator');
+const contactValidator     = require('../validators/contact.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
 const { requireRole }      = require('../middleware/role.middleware');
@@ -35,6 +37,7 @@ const studentIdParam = [
 const studentListQuery = [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('search').optional().isString().trim().isLength({ max: 100 }).withMessage('Search query cannot exceed 100 characters'),
 ];
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
@@ -229,7 +232,7 @@ router.patch('/enrollments/:id/reject', enrollmentValidator.reject, validate, ad
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/feedback', contactController.getAllFeedback);
+router.get('/feedback', contactValidator.listQuery, validate, contactController.getAllFeedback);
 
 // ── Student Management ─────────────────────────────────────────────────────
 
@@ -383,7 +386,7 @@ router.post('/admins', adminValidator.createAdmin, validate, adminController.cre
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/courses', adminController.getAllCourses);
+router.get('/courses', courseValidator.listQuery, validate, adminController.getAllCourses);
 
 // ── Competition Registration Management ────────────────────────────────────
 

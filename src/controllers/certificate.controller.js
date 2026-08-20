@@ -8,6 +8,7 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const notificationService = require('../services/notification.service');
 const { ROLES } = require('../constants');
+const escapeRegex = require('../utils/escapeRegex');
 
 const generateCertificateNumber = () => {
   const year = new Date().getFullYear();
@@ -103,6 +104,13 @@ exports.issueCertificate = asyncHandler(async (req, res) => {
 
   const student = await User.findById(studentId);
   if (!student) throw new ApiError(404, 'Student not found.');
+  if (student.role !== ROLES.STUDENT) throw new ApiError(400, 'Certificates can only be issued to students.');
+  if (type === 'course_completion' && !courseId) {
+    throw new ApiError(400, 'A course is required for a course completion certificate.');
+  }
+  if (['competition_achievement', 'hackathon_winner'].includes(type) && !competitionId) {
+    throw new ApiError(400, 'A competition is required for this certificate type.');
+  }
 
   // Verify course/competition if provided
   if (courseId) {
@@ -185,9 +193,10 @@ exports.getAllCertificates = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
 
   if (search) {
+    const escaped = escapeRegex(search);
     filter.$or = [
-      { certificateNumber: { $regex: search, $options: 'i' } },
-      { title: { $regex: search, $options: 'i' } },
+      { certificateNumber: { $regex: escaped, $options: 'i' } },
+      { title: { $regex: escaped, $options: 'i' } },
     ];
   }
 

@@ -34,4 +34,9 @@ const listQuery = [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
 ];
 
-module.exports = { create, update, siteIdParam, listQuery };
+const publicListQuery = [
+  query('search').optional().isString().withMessage('Search must be text')
+    .trim().isLength({ max: 100 }).withMessage('Search cannot exceed 100 characters'),
+];
+
+module.exports = { create, update, siteIdParam, listQuery, publicListQuery };

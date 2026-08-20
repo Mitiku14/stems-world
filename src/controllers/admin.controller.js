@@ -9,6 +9,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const { ROLES, ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
 const notificationService = require('../services/notification.service');
+const escapeRegex = require('../utils/escapeRegex');
 
 const paginate = (total, page, limit) => ({
   total,
@@ -130,11 +131,12 @@ exports.getAllEnrollments = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
 
   if (search) {
+    const escaped = escapeRegex(search);
     const students = await User.find({
       role: ROLES.STUDENT,
       $or: [
-        { name:  { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
+        { name:  { $regex: escaped, $options: 'i' } },
+        { email: { $regex: escaped, $options: 'i' } },
       ],
     }).select('_id').lean();
 
@@ -143,8 +145,8 @@ exports.getAllEnrollments = asyncHandler(async (req, res) => {
     // Search also covers anonymous enrollments stored by email/name
     filter.$or = [
       { student: { $in: studentIds } },
-      { studentName:  { $regex: search, $options: 'i' } },
-      { studentEmail: { $regex: search, $options: 'i' } },
+      { studentName:  { $regex: escaped, $options: 'i' } },
+      { studentEmail: { $regex: escaped, $options: 'i' } },
     ];
   }
 
@@ -301,10 +303,11 @@ exports.getAllStudents = asyncHandler(async (req, res) => {
 
   const filter = { role: ROLES.STUDENT };
   if (search) {
+    const escaped = escapeRegex(search);
     filter.$or = [
-      { name:     { $regex: search, $options: 'i' } },
-      { email:    { $regex: search, $options: 'i' } },
-      { username: { $regex: search, $options: 'i' } },
+      { name:     { $regex: escaped, $options: 'i' } },
+      { email:    { $regex: escaped, $options: 'i' } },
+      { username: { $regex: escaped, $options: 'i' } },
     ];
   }
 
@@ -364,7 +367,7 @@ exports.deleteStudent = asyncHandler(async (req, res) => {
   await Enrollment.deleteMany({ student: req.params.id });
   await student.deleteOne();
 
-  return res.json(new ApiResponse(200, 'Student and all associated data deleted successfully.'));
+  return res.json(new ApiResponse(200, 'Student account and course enrollments deleted successfully.'));
 });
 
 // ── Admin Management ───────────────────────────────────────────────────────

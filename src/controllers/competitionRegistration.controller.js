@@ -6,6 +6,8 @@ const ApiResponse = require('../utils/ApiResponse');
 const { ENROLLMENT_STATUS } = require('../constants');
 const emailService = require('../services/email.service');
 const notificationService = require('../services/notification.service');
+const User = require('../models/User');
+const escapeRegex = require('../utils/escapeRegex');
 
 const paginate = (total, page, limit) => ({
   total,
@@ -43,6 +45,10 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
 
   const competition = await Competition.findOne({ _id: compId, isActive: true });
   if (!competition) throw new ApiError(404, 'Competition not found or no longer available.');
+
+  if (!req.user && await User.exists({ email })) {
+    throw new ApiError(409, 'An account already exists with this email. Please sign in to register.');
+  }
 
   if (competition.status !== 'open') {
     throw new ApiError(400, `Registration is not open for this competition (Status: ${competition.status}).`);
@@ -144,10 +150,11 @@ exports.getAllRegistrations = asyncHandler(async (req, res) => {
   if (competitionId) filter.competition = competitionId;
 
   if (search) {
+    const escaped = escapeRegex(search);
     filter.$or = [
-      { fullName: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
-      { teamName: { $regex: search, $options: 'i' } },
+      { fullName: { $regex: escaped, $options: 'i' } },
+      { email: { $regex: escaped, $options: 'i' } },
+      { teamName: { $regex: escaped, $options: 'i' } },
     ];
   }
 

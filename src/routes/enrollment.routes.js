@@ -114,7 +114,7 @@ router.use(verifyToken, requireRole(ROLES.STUDENT));
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
-router.get('/my', enrollmentController.getMyEnrollments);
+router.get('/my', enrollmentValidator.myListQuery, validate, enrollmentController.getMyEnrollments);
 
 /**
  * @swagger

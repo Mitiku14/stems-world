@@ -27,8 +27,6 @@ const certificateRoutes  = require('./src/routes/certificate.routes');
 
 const app = express();
 
-connectDB();
-
 // Helmet — disable CSP only for Swagger UI (it loads inline scripts)
 app.use((req, res, next) => {
   const helmetOptions = req.path.startsWith('/api-docs')
@@ -127,14 +125,22 @@ app.use((_req, res) => {
 
 app.use(errorMiddleware);
 
-const server = app.listen(env.port, () => {
-  console.log(`\n🚀 Server running in ${env.nodeEnv} mode on http://localhost:${env.port}`);
-  console.log(`📋 Health check:  http://localhost:${env.port}/health`);
-  console.log(`📖 API Docs:      http://localhost:${env.port}/api-docs\n`);
-});
+let server;
+
+const startServer = async () => {
+  await connectDB();
+  server = app.listen(env.port, () => {
+    console.log(`\n🚀 Server running in ${env.nodeEnv} mode on http://localhost:${env.port}`);
+    console.log(`📋 Health check:  http://localhost:${env.port}/health`);
+    console.log(`📖 API Docs:      http://localhost:${env.port}/api-docs\n`);
+  });
+};
+
+startServer();
 
 const shutdown = (signal) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+  if (!server) return process.exit(0);
   server.close(async () => {
     const mongoose = require('mongoose');
     try {

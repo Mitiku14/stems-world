@@ -1,9 +1,8 @@
 const { body } = require('express-validator');
 
-// Frontend register form only enforces minLength:6 — backend matches that exactly
 const passwordRules = (field) => [
   body(field).notEmpty().withMessage('Password is required'),
-  body(field).isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body(field).isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
 ];
 
 // Frontend signup sends: { fullName, email, password }
@@ -24,11 +23,21 @@ const register = [
 // Frontend login sends: { email, password }
 // The frontend uses email field directly (not a combined "identifier" field).
 const login = [
-  body('email')
-    .trim().notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Please provide a valid email address')
-    .normalizeEmail(),
-
+  body('email').optional().trim(),
+  body('identifier').optional().trim(),
+  body().custom((_, { req }) => {
+    const id = req.body.email || req.body.identifier;
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      throw new Error('Email or username identifier is required');
+    }
+    if (id.includes('@')) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(id.trim())) {
+        throw new Error('Please provide a valid email address');
+      }
+    }
+    return true;
+  }),
   body('password').notEmpty().withMessage('Password is required'),
 ];
 

@@ -43,7 +43,11 @@ exports.getCompetitions = asyncHandler(async (req, res) => {
 
 // Public — single competition
 exports.getCompetition = asyncHandler(async (req, res) => {
-  const competition = await Competition.findOne({ _id: req.params.id, isActive: true }).lean();
+  const competition = await Competition.findOne({
+    _id: req.params.id,
+    isActive: true,
+    status: { $in: ['open', 'upcoming', 'completed'] },
+  }).lean();
   if (!competition) throw new ApiError(404, 'Competition not found or inactive.');
   return res.json(new ApiResponse(200, 'Competition fetched successfully.', competition));
 });

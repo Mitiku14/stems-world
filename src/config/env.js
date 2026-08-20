@@ -19,7 +19,7 @@ if (missing.length > 0) {
 }
 
 module.exports = {
-  port:    process.env.PORT || 5000,
+  port:    parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: process.env.MONGODB_URI,
 
@@ -30,7 +30,7 @@ module.exports = {
 
   email: {
     host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
+    port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
     from: process.env.EMAIL_FROM,

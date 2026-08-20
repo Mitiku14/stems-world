@@ -47,6 +47,7 @@ const adminListQuery = [
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('status').optional().isIn(validStatuses),
   query('competitionId').optional().custom((v) => mongoose.Types.ObjectId.isValid(v)),
+  query('search').optional().isString().trim().isLength({ max: 100 }),
 ];
 
 module.exports = {
