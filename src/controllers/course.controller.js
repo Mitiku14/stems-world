@@ -24,7 +24,7 @@ exports.getCourses = asyncHandler(async (req, res) => {
 
   const [courses, total] = await Promise.all([
     Course.find(filter)
-      .select('title description category level requiresDocument imageUrl syllabus instructor duration requirements registrationOpenDate registrationCloseDate season maxStudents isActive createdAt')
+      .select('frontendId title description category level requiresDocument imageUrl syllabus instructor duration requirements registrationOpenDate registrationCloseDate season maxStudents isActive createdAt')
       .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)
