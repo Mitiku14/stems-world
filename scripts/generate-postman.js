@@ -5,7 +5,7 @@ const collection = {
   info: {
     _postman_id: 'e-learning-platform-api-collection-v1',
     name: 'E-Learning Platform API Specification',
-    description: 'Production-ready Postman collection for E-Learning Platform backend, covering all 58 HTTP endpoints.',
+    description: 'Production-ready Postman collection for E-Learning Platform backend HTTP endpoints.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
   },
   variable: [
@@ -15,6 +15,7 @@ const collection = {
     { key: 'verification_token', value: 'sample_raw_hex_token', type: 'string' },
     { key: 'reset_token', value: 'sample_raw_hex_token', type: 'string' },
     { key: 'course_id', value: '64a1b2c3d4e5f6789012abcd', type: 'string' },
+    { key: 'course_subcategory_id', value: '64a1b2c3d4e5f6789012abca', type: 'string' },
     { key: 'resource_id', value: '64a1b2c3d4e5f6789012abce', type: 'string' },
     { key: 'enrollment_id', value: '64a1b2c3d4e5f6789012abcf', type: 'string' },
     { key: 'competition_id', value: '64a1b2c3d4e5f6789012abd0', type: 'string' },
@@ -226,6 +227,75 @@ const coursesFolder = {
       }
     },
     {
+      name: 'Admin List Managed Course Subcategories',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'GET',
+        url: {
+          raw: '{{BASE_URL}}/api/admin/course-subcategories?category=technology&isActive=true&search=development&page=1&limit=20',
+          host: ['{{BASE_URL}}'],
+          path: ['api', 'admin', 'course-subcategories'],
+          query: [
+            { key: 'category', value: 'technology' },
+            { key: 'isActive', value: 'true' },
+            { key: 'search', value: 'development' },
+            { key: 'page', value: '1' },
+            { key: 'limit', value: '20' }
+          ]
+        }
+      }
+    },
+    {
+      name: 'Admin Create Managed Course Subcategory',
+      event: [{
+        listen: 'test',
+        script: {
+          type: 'text/javascript',
+          exec: [
+            'pm.test("Status code is 201", function () { pm.response.to.have.status(201); });',
+            'pm.test("Managed subcategory ID is captured", function () {',
+            '    var jsonData = pm.response.json();',
+            '    pm.expect(jsonData).to.have.property("success", true);',
+            '    pm.environment.set("course_subcategory_id", jsonData.data._id);',
+            '});'
+          ]
+        }
+      }],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'POST',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({
+            name: 'Web Development',
+            slug: 'web_development',
+            category: 'technology'
+          }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/admin/course-subcategories', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'course-subcategories'] }
+      }
+    },
+    {
+      name: 'Admin Update Managed Course Subcategory',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'PUT',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({ name: 'Full-Stack Web Development' }, null, 2)
+        },
+        url: {
+          raw: '{{BASE_URL}}/api/admin/course-subcategories/{{course_subcategory_id}}',
+          host: ['{{BASE_URL}}'],
+          path: ['api', 'admin', 'course-subcategories', '{{course_subcategory_id}}']
+        }
+      }
+    },
+    {
       name: 'List / Search / Filter Courses',
       event: [makeTest(200)],
       request: {
@@ -271,22 +341,35 @@ const coursesFolder = {
         body: {
           mode: 'raw',
           raw: JSON.stringify({
-            title: 'Advanced Robotics & Automation',
-            description: 'Learn modern robotics systems and control software.',
-            category: 'engineering',
-            subcategory: 'interdisciplinary',
+            title: 'Full Stack Web Development',
+            description: 'Learn modern frontend and backend web development.',
+            category: 'technology',
+            subcategory: 'web_development',
             level: 'advanced',
             requiresDocument: true,
-            imageUrl: 'https://example.com/images/robotics.jpg',
-            syllabus: ['Robotics Fundamentals', 'Kinematics', 'ROS Setup'],
-            instructor: 'Dr. Alan Turing',
+            imageUrl: 'https://example.com/images/web-development.jpg',
+            syllabus: ['HTML & CSS', 'JavaScript', 'Backend APIs'],
+            instructor: 'Ms. Ada Lovelace',
             duration: '10 weeks',
             season: 'Fall 2026',
             maxStudents: 25,
-            frontendId: 'robotics-adv-1'
+            frontendId: 'web-development-1'
           }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/courses', host: ['{{BASE_URL}}'], path: ['api', 'courses'] }
+      }
+    },
+    {
+      name: 'Admin Toggle Managed Course Subcategory Status',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'PATCH',
+        url: {
+          raw: '{{BASE_URL}}/api/admin/course-subcategories/{{course_subcategory_id}}/toggle-status',
+          host: ['{{BASE_URL}}'],
+          path: ['api', 'admin', 'course-subcategories', '{{course_subcategory_id}}', 'toggle-status']
+        }
       }
     },
     {
@@ -298,7 +381,7 @@ const coursesFolder = {
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
           mode: 'raw',
-          raw: JSON.stringify({ title: 'Advanced Robotics & Automation (Updated)', duration: '12 weeks' }, null, 2)
+          raw: JSON.stringify({ title: 'Full Stack Web Development (Updated)', duration: '12 weeks' }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/courses/{{course_id}}', host: ['{{BASE_URL}}'], path: ['api', 'courses', '{{course_id}}'] }
       }
@@ -1085,6 +1168,7 @@ const environment = {
     { key: 'verification_token', value: 'sample_raw_token', enabled: true },
     { key: 'reset_token', value: 'sample_raw_token', enabled: true },
     { key: 'course_id', value: '64a1b2c3d4e5f6789012abcd', enabled: true },
+    { key: 'course_subcategory_id', value: '64a1b2c3d4e5f6789012abca', enabled: true },
     { key: 'resource_id', value: '64a1b2c3d4e5f6789012abce', enabled: true },
     { key: 'enrollment_id', value: '64a1b2c3d4e5f6789012abcf', enabled: true },
     { key: 'competition_id', value: '64a1b2c3d4e5f6789012abd0', enabled: true },

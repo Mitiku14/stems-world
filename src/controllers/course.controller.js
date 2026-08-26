@@ -3,7 +3,8 @@ const Enrollment = require('../models/Enrollment');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, ENROLLMENT_STATUS } = require('../constants');
+const CourseSubcategory = require('../models/CourseSubcategory');
+const { COURSE_CATEGORIES, ENROLLMENT_STATUS } = require('../constants');
 
 const buildPagination = (total, page, limit) => ({
   total,
@@ -13,9 +14,15 @@ const buildPagination = (total, page, limit) => ({
 });
 
 exports.getCourseTaxonomy = asyncHandler(async (_req, res) => {
-  const taxonomy = Object.fromEntries(
-    COURSE_CATEGORIES.map((category) => [category, [...STEAM_SUBCATEGORIES[category]]])
-  );
+  const taxonomy = Object.fromEntries(COURSE_CATEGORIES.map((category) => [category, []]));
+  const subcategories = await CourseSubcategory.find({ isActive: true })
+    .select('name slug category')
+    .sort({ name: 1, slug: 1 })
+    .lean();
+
+  for (const sub of subcategories) {
+    if (taxonomy[sub.category]) taxonomy[sub.category].push({ name: sub.name, slug: sub.slug });
+  }
 
   return res.json(new ApiResponse(200, 'Course taxonomy fetched successfully.', taxonomy));
 });

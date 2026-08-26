@@ -1,14 +1,27 @@
 const { body, query, param } = require('express-validator');
 const mongoose = require('mongoose');
-const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, COURSE_LEVELS } = require('../constants');
+const {
+  COURSE_CATEGORIES,
+  COURSE_SUBCATEGORY_SLUG_REGEX,
+  COURSE_LEVELS,
+} = require('../constants');
 const Course = require('../models/Course');
+const CourseSubcategory = require('../models/CourseSubcategory');
 const Site = require('../models/Site');
 
-const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
+const validateTaxonomyPair = async (category, subcategory) => {
+  if (typeof subcategory !== 'string' || !COURSE_SUBCATEGORY_SLUG_REGEX.test(subcategory)) {
+    return true;
+  }
 
-const validateTaxonomyPair = (category, subcategory) => {
-  if (STEAM_SUBCATEGORIES[category]?.includes(subcategory)) return true;
-  throw new Error(`Subcategory "${subcategory}" is not valid for category "${category}"`);
+  const filter = { slug: subcategory, isActive: true };
+  if (category !== undefined) filter.category = category;
+  if (await CourseSubcategory.exists(filter)) return true;
+
+  if (category === undefined) {
+    throw new Error(`Subcategory "${subcategory}" is not active or does not exist`);
+  }
+  throw new Error(`Subcategory "${subcategory}" is not active for category "${category}"`);
 };
 
 const validateUpdatedTaxonomy = async (payload, req) => {
@@ -68,8 +81,10 @@ const create = [
   body('category').notEmpty().withMessage('Course category is required').bail()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
 
-  body('subcategory').notEmpty().withMessage('Course subcategory is required').bail()
-    .isIn(courseSubcategories).withMessage('Subcategory is not recognized').bail()
+  body('subcategory').isString().withMessage('Course subcategory must be text').bail()
+    .trim().notEmpty().withMessage('Course subcategory is required').bail()
+    .matches(COURSE_SUBCATEGORY_SLUG_REGEX)
+    .withMessage('Course subcategory must be a lowercase underscore-separated slug').bail()
     .custom((value, { req }) => validateTaxonomyPair(req.body.category, value)),
 
   body('level').optional()
@@ -148,8 +163,9 @@ const update = [
   body('category').optional()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
 
-  body('subcategory').optional()
-    .isIn(courseSubcategories).withMessage('Subcategory is not recognized'),
+  body('subcategory').optional().isString().withMessage('Course subcategory must be text').bail()
+    .trim().matches(COURSE_SUBCATEGORY_SLUG_REGEX)
+    .withMessage('Course subcategory must be a lowercase underscore-separated slug'),
 
   body().custom((payload, { req }) => validateUpdatedTaxonomy(payload, req)),
 
@@ -261,10 +277,11 @@ const listQuery = [
   query('search').optional().isString().trim().isLength({ max: 100 }).withMessage('Search query cannot exceed 100 characters'),
   query('category').optional()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
-  query('subcategory').optional()
-    .isIn(courseSubcategories).withMessage('Subcategory is not recognized'),
+  query('subcategory').optional().isString().withMessage('Subcategory must be text').bail()
+    .trim().matches(COURSE_SUBCATEGORY_SLUG_REGEX)
+    .withMessage('Subcategory must be a lowercase underscore-separated slug'),
   query().custom((values) => {
-    if (!values.category || !values.subcategory) return true;
+    if (!values.subcategory) return true;
     return validateTaxonomyPair(values.category, values.subcategory);
   }),
   query('level').optional()

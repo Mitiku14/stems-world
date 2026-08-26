@@ -11,6 +11,7 @@ const exportController     = require('../controllers/export.controller');
 const notificationController = require('../controllers/notification.controller');
 const certificateController = require('../controllers/certificate.controller');
 const resourceController   = require('../controllers/resource.controller');
+const courseSubcategoryController = require('../controllers/courseSubcategory.controller');
 
 const adminValidator       = require('../validators/admin.validator');
 const enrollmentValidator  = require('../validators/enrollment.validator');
@@ -20,6 +21,7 @@ const notificationValidator = require('../validators/notification.validator');
 const certificateValidator = require('../validators/certificate.validator');
 const resourceValidator    = require('../validators/resource.validator');
 const courseValidator      = require('../validators/course.validator');
+const courseSubcategoryValidator = require('../validators/courseSubcategory.validator');
 const contactValidator     = require('../validators/contact.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
@@ -375,7 +377,7 @@ router.post('/admins', adminValidator.createAdmin, validate, adminController.cre
  *         schema: { $ref: '#/components/schemas/CourseCategory' }
  *       - in: query
  *         name: subcategory
- *         schema: { $ref: '#/components/schemas/CourseSubcategory' }
+ *         schema: { $ref: '#/components/schemas/CourseSubcategorySlug' }
  *       - in: query
  *         name: level
  *         schema: { type: string }
@@ -390,6 +392,148 @@ router.post('/admins', adminValidator.createAdmin, validate, adminController.cre
  *         $ref: '#/components/responses/Forbidden'
  */
 router.get('/courses', courseValidator.listQuery, validate, adminController.getAllCourses);
+
+// ── Course Subcategory Management ─────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/course-subcategories:
+ *   get:
+ *     summary: List managed Course subcategories
+ *     description: Returns active and inactive Course subcategories. Top-level STEAM categories remain fixed in the backend.
+ *     tags: [Admin — Course Subcategories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: category
+ *         schema: { $ref: '#/components/schemas/CourseCategory' }
+ *       - in: query
+ *         name: isActive
+ *         schema: { type: boolean }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string, maxLength: 100 }
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *     responses:
+ *       200:
+ *         description: Course subcategories fetched successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.get(
+  '/course-subcategories',
+  courseSubcategoryValidator.listQuery,
+  validate,
+  courseSubcategoryController.getAllCourseSubcategories
+);
+
+/**
+ * @swagger
+ * /api/admin/course-subcategories:
+ *   post:
+ *     summary: Create a managed Course subcategory
+ *     description: Creates a globally unique subcategory slug under one fixed STEAM category. The new active slug immediately becomes available to Course validation and public taxonomy discovery.
+ *     tags: [Admin — Course Subcategories]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CourseSubcategoryInput'
+ *     responses:
+ *       201:
+ *         description: Course subcategory created successfully
+ *       409:
+ *         description: Course subcategory slug already exists
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.post(
+  '/course-subcategories',
+  courseSubcategoryValidator.create,
+  validate,
+  courseSubcategoryController.createCourseSubcategory
+);
+
+/**
+ * @swagger
+ * /api/admin/course-subcategories/{id}:
+ *   put:
+ *     summary: Update a managed Course subcategory
+ *     description: Name and active state may be updated safely. Changing slug or category returns 409 when existing Courses reference the current pair.
+ *     tags: [Admin — Course Subcategories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string, maxLength: 100, example: Web Development }
+ *               slug: { $ref: '#/components/schemas/CourseSubcategorySlug' }
+ *               category: { $ref: '#/components/schemas/CourseCategory' }
+ *               isActive: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Course subcategory updated successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         description: Structural update would invalidate referenced Courses or duplicate a slug
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.put(
+  '/course-subcategories/:id',
+  courseSubcategoryValidator.subcategoryIdParam,
+  courseSubcategoryValidator.update,
+  validate,
+  courseSubcategoryController.updateCourseSubcategory
+);
+
+/**
+ * @swagger
+ * /api/admin/course-subcategories/{id}/toggle-status:
+ *   patch:
+ *     summary: Activate or deactivate a managed Course subcategory
+ *     description: Inactive subcategories are hidden from public taxonomy and rejected for new Course assignments. Existing Courses remain readable.
+ *     tags: [Admin — Course Subcategories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Course subcategory status toggled successfully
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.patch(
+  '/course-subcategories/:id/toggle-status',
+  courseSubcategoryValidator.subcategoryIdParam,
+  validate,
+  courseSubcategoryController.toggleCourseSubcategoryStatus
+);
 
 // ── Competition Registration Management ────────────────────────────────────
 
@@ -879,5 +1023,3 @@ router.delete('/courses/:courseId/resources/:resourceId', resourceValidator.reso
 router.patch('/courses/:courseId/resources/reorder', resourceValidator.courseIdParam, validate, resourceController.reorderResources);
 
 module.exports = router;
-
-

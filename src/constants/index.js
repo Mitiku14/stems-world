@@ -25,27 +25,7 @@ const AUTH_PROVIDERS = {
 };
 
 const COURSE_CATEGORIES = ['science', 'technology', 'engineering', 'arts', 'mathematics'];
-const STEAM_SUBCATEGORIES = {
-  science: [
-    'general_science',
-    'biology',
-    'chemistry',
-    'physics',
-    'environmental_science',
-  ],
-  technology: ['programming', 'machine_learning', 'computer_literacy'],
-  engineering: ['interdisciplinary'],
-  arts: ['language_arts'],
-  mathematics: [
-    'elementary_mathematics',
-    'middle_school_mathematics',
-    'pre_algebra',
-    'algebra',
-    'geometry_trigonometry',
-    'pre_calculus',
-    'calculus',
-  ],
-};
+const COURSE_SUBCATEGORY_SLUG_REGEX = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 const COURSE_LEVELS     = ['beginner', 'intermediate', 'advanced', 'all'];
 
 const COMPETITION_TYPES = ['competition', 'hackathon', 'workshop', 'training', 'event'];
@@ -59,7 +39,7 @@ module.exports = {
   TOKEN_EXPIRY,
   AUTH_PROVIDERS,
   COURSE_CATEGORIES,
-  STEAM_SUBCATEGORIES,
+  COURSE_SUBCATEGORY_SLUG_REGEX,
   COURSE_LEVELS,
   COMPETITION_TYPES,
   COMPETITION_SCOPES,

@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
-const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, COURSE_LEVELS } = require('../constants');
-
-const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
+const { COURSE_CATEGORIES, COURSE_LEVELS } = require('../constants');
+const CourseSubcategory = require('./CourseSubcategory');
 
 const resourceSchema = new mongoose.Schema(
   {
@@ -66,16 +65,23 @@ const courseSchema = new mongoose.Schema(
     subcategory: {
       type: String,
       required: [true, 'Course subcategory is required'],
-      enum: courseSubcategories,
       validate: {
-        validator(value) {
+        async validator(value) {
           const update = typeof this.getUpdate === 'function' ? this.getUpdate() : null;
           const category = update
             ? update.category ?? update.$set?.category
             : this.category;
-          return STEAM_SUBCATEGORIES[category]?.includes(value) === true;
+          if (!update && !this.isNew
+              && !this.isModified('category') && !this.isModified('subcategory')) {
+            return true;
+          }
+          return Boolean(await CourseSubcategory.exists({
+            category,
+            slug: value,
+            isActive: true,
+          }));
         },
-        message: 'Course subcategory must belong to its category',
+        message: 'Course subcategory must be an active managed subcategory belonging to its category',
       },
     },
 

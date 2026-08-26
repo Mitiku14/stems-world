@@ -1,14 +1,19 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES } = require('../constants');
+const { COURSE_CATEGORIES } = require('../constants');
 
-const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
 const courseTaxonomyProperties = Object.fromEntries(
   COURSE_CATEGORIES.map((category) => [
     category,
     {
       type: 'array',
-      items: { type: 'string', enum: STEAM_SUBCATEGORIES[category] },
-      example: [...STEAM_SUBCATEGORIES[category]],
+      items: {
+        type: 'object',
+        required: ['name', 'slug'],
+        properties: {
+          name: { type: 'string', description: 'Admin-managed display label', example: 'Programming' },
+          slug: { $ref: '#/components/schemas/CourseSubcategorySlug' },
+        },
+      },
     },
   ])
 );
@@ -83,16 +88,41 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
           example: 'technology',
         },
 
-        CourseSubcategory: {
+        CourseSubcategorySlug: {
           type: 'string',
-          enum: courseSubcategories,
-          example: 'machine_learning',
-          description: 'Controlled specialization that must belong to the selected Course category',
+          pattern: '^[a-z0-9]+(?:_[a-z0-9]+)*$',
+          example: 'programming',
+          description: 'Globally unique, admin-managed slug that must be active and belong to the selected fixed STEAM category',
+        },
+
+        CourseSubcategory: {
+          type: 'object',
+          required: ['name', 'slug', 'category', 'isActive'],
+          properties: {
+            _id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            name: { type: 'string', maxLength: 100, example: 'Programming' },
+            slug: { $ref: '#/components/schemas/CourseSubcategorySlug' },
+            category: { $ref: '#/components/schemas/CourseCategory' },
+            isActive: { type: 'boolean', example: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        CourseSubcategoryInput: {
+          type: 'object',
+          required: ['name', 'slug', 'category'],
+          properties: {
+            name: { type: 'string', maxLength: 100, example: 'Web Development' },
+            slug: { $ref: '#/components/schemas/CourseSubcategorySlug' },
+            category: { $ref: '#/components/schemas/CourseCategory' },
+            isActive: { type: 'boolean', default: true },
+          },
         },
 
         CourseTaxonomy: {
           type: 'object',
-          description: 'Canonical Course category-to-subcategories mapping',
+          description: 'All fixed STEAM categories mapped to active database-managed subcategories. Each subcategory includes a human-readable name and a machine-safe slug. Empty categories are returned as empty arrays.',
           required: COURSE_CATEGORIES,
           additionalProperties: false,
           properties: courseTaxonomyProperties,
@@ -177,7 +207,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             title: { type: 'string', example: 'Introduction to Machine Learning' },
             description: { type: 'string', example: 'Learn the foundations of machine learning.' },
             category: { $ref: '#/components/schemas/CourseCategory' },
-            subcategory: { $ref: '#/components/schemas/CourseSubcategory' },
+            subcategory: { $ref: '#/components/schemas/CourseSubcategorySlug' },
             level: {
               type: 'string',
               enum: ['beginner', 'intermediate', 'advanced', 'all'],
@@ -487,6 +517,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
       { name: 'Admin — Sites',        description: 'Admin site/location management' },
       { name: 'Competitions',         description: 'Public competition endpoints' },
       { name: 'Admin — Competitions', description: 'Admin competition management and registration review' },
+      { name: 'Admin — Course Subcategories', description: 'Admin managed Course subcategory CRUD — create, rename, activate/deactivate subcategories under fixed STEAM categories' },
     ],
   },
 

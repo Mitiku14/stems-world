@@ -12,6 +12,7 @@ const CompetitionRegistration = require('../src/models/CompetitionRegistration')
 const Enrollment = require('../src/models/Enrollment');
 const Notification = require('../src/models/Notification');
 const Certificate = require('../src/models/Certificate');
+const { ensureInitialCourseSubcategories } = require('../seed/courseSubcategory.seed');
 const jwt = require('jsonwebtoken');
 const env = require('../src/config/env');
 
@@ -44,6 +45,7 @@ const failureDetails = [];
 const setupFixtures = async () => {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('📦 Connected to DB for Postman verification fixtures...');
+  await ensureInitialCourseSubcategories();
 
   const hashedPassword = await bcrypt.hash('Password123!', 10);
 

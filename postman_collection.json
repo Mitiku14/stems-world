@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e-learning-platform-api-collection-v1",
     "name": "E-Learning Platform API Specification",
-    "description": "Production-ready Postman collection for E-Learning Platform backend, covering all 58 HTTP endpoints.",
+    "description": "Production-ready Postman collection for E-Learning Platform backend HTTP endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -34,6 +34,11 @@
     {
       "key": "course_id",
       "value": "64a1b2c3d4e5f6789012abcd",
+      "type": "string"
+    },
+    {
+      "key": "course_subcategory_id",
+      "value": "64a1b2c3d4e5f6789012abca",
       "type": "string"
     },
     {
@@ -636,6 +641,182 @@
           }
         },
         {
+          "name": "Admin List Managed Course Subcategories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/course-subcategories?category=technology&isActive=true&search=development&page=1&limit=20",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "course-subcategories"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "technology"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true"
+                },
+                {
+                  "key": "search",
+                  "value": "development"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Create Managed Course Subcategory",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Managed subcategory ID is captured\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property(\"success\", true);",
+                  "    pm.environment.set(\"course_subcategory_id\", jsonData.data._id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Web Development\",\n  \"slug\": \"web_development\",\n  \"category\": \"technology\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/course-subcategories",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "course-subcategories"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Update Managed Course Subcategory",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Full-Stack Web Development\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/course-subcategories/{{course_subcategory_id}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "course-subcategories",
+                "{{course_subcategory_id}}"
+              ]
+            }
+          }
+        },
+        {
           "name": "List / Search / Filter Courses",
           "event": [
             {
@@ -806,7 +987,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Advanced Robotics & Automation\",\n  \"description\": \"Learn modern robotics systems and control software.\",\n  \"category\": \"engineering\",\n  \"subcategory\": \"interdisciplinary\",\n  \"level\": \"advanced\",\n  \"requiresDocument\": true,\n  \"imageUrl\": \"https://example.com/images/robotics.jpg\",\n  \"syllabus\": [\n    \"Robotics Fundamentals\",\n    \"Kinematics\",\n    \"ROS Setup\"\n  ],\n  \"instructor\": \"Dr. Alan Turing\",\n  \"duration\": \"10 weeks\",\n  \"season\": \"Fall 2026\",\n  \"maxStudents\": 25,\n  \"frontendId\": \"robotics-adv-1\"\n}"
+              "raw": "{\n  \"title\": \"Full Stack Web Development\",\n  \"description\": \"Learn modern frontend and backend web development.\",\n  \"category\": \"technology\",\n  \"subcategory\": \"web_development\",\n  \"level\": \"advanced\",\n  \"requiresDocument\": true,\n  \"imageUrl\": \"https://example.com/images/web-development.jpg\",\n  \"syllabus\": [\n    \"HTML & CSS\",\n    \"JavaScript\",\n    \"Backend APIs\"\n  ],\n  \"instructor\": \"Ms. Ada Lovelace\",\n  \"duration\": \"10 weeks\",\n  \"season\": \"Fall 2026\",\n  \"maxStudents\": 25,\n  \"frontendId\": \"web-development-1\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/courses",
@@ -816,6 +997,53 @@
               "path": [
                 "api",
                 "courses"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Toggle Managed Course Subcategory Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/course-subcategories/{{course_subcategory_id}}/toggle-status",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "course-subcategories",
+                "{{course_subcategory_id}}",
+                "toggle-status"
               ]
             }
           }
@@ -860,7 +1088,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Advanced Robotics & Automation (Updated)\",\n  \"duration\": \"12 weeks\"\n}"
+              "raw": "{\n  \"title\": \"Full Stack Web Development (Updated)\",\n  \"duration\": \"12 weeks\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/courses/{{course_id}}",

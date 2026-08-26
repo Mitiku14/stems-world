@@ -18,8 +18,8 @@ const { ROLES } = require('../constants');
  * @swagger
  * /api/courses/taxonomy:
  *   get:
- *     summary: Get the canonical Course taxonomy
- *     description: Returns the canonical Course category-to-subcategories mapping for building category and dependent subcategory selectors. No authentication required.
+ *     summary: Get the active managed Course taxonomy
+ *     description: Returns all five fixed STEAM categories mapped to active database-managed subcategory slugs. Categories with no active subcategories are returned as empty arrays. No authentication required.
  *     tags: [Courses]
  *     responses:
  *       200:
@@ -58,7 +58,7 @@ router.get('/taxonomy', courseController.getCourseTaxonomy);
  *         description: Filter by course category
  *       - in: query
  *         name: subcategory
- *         schema: { $ref: '#/components/schemas/CourseSubcategory' }
+ *         schema: { $ref: '#/components/schemas/CourseSubcategorySlug' }
  *         description: Filter by controlled specialization
  *       - in: query
  *         name: level
@@ -153,7 +153,7 @@ router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, re
  * /api/courses:
  *   post:
  *     summary: Create a new course (Admin only)
- *     description: Creates a new course. Requires admin authentication.
+ *     description: Creates a new course. The category must be a fixed STEAM category and the subcategory must be an active managed slug belonging to it. Requires admin authentication.
  *     tags: [Courses]
  *     security:
  *       - BearerAuth: []
@@ -176,7 +176,7 @@ router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, re
  *               category:
  *                 $ref: '#/components/schemas/CourseCategory'
  *               subcategory:
- *                 $ref: '#/components/schemas/CourseSubcategory'
+ *                 $ref: '#/components/schemas/CourseSubcategorySlug'
  *               level:
  *                 type: string
  *                 enum: [beginner, intermediate, advanced, all]
@@ -276,7 +276,7 @@ router.post(
  * /api/courses/{id}:
  *   put:
  *     summary: Update a course (Admin only)
- *     description: Updates one or more fields of an existing course. All fields are optional — only provided fields are updated.
+ *     description: Updates only provided fields. Taxonomy changes are validated against the final category/subcategory pair and require an active managed subcategory.
  *     tags: [Courses]
  *     security:
  *       - BearerAuth: []
@@ -304,7 +304,7 @@ router.post(
  *               category:
  *                 $ref: '#/components/schemas/CourseCategory'
  *               subcategory:
- *                 $ref: '#/components/schemas/CourseSubcategory'
+ *                 $ref: '#/components/schemas/CourseSubcategorySlug'
  *               level:
  *                 type: string
  *                 enum: [beginner, intermediate, advanced, all]

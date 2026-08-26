@@ -14,10 +14,12 @@ const certificateValidator = require('../src/validators/certificate.validator');
 const courseValidator = require('../src/validators/course.validator');
 const siteValidator = require('../src/validators/site.validator');
 const Course = require('../src/models/Course');
+const CourseSubcategory = require('../src/models/CourseSubcategory');
 const courseController = require('../src/controllers/course.controller');
 const courseRoutes = require('../src/routes/course.routes');
 const exportController = require('../src/controllers/export.controller');
-const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES } = require('../src/constants');
+const { COURSE_CATEGORIES } = require('../src/constants');
+const { INITIAL_COURSE_SUBCATEGORIES } = require('../seed/courseSubcategory.data');
 const env = require('../src/config/env');
 
 const validate = async (chains, request = {}) => {
@@ -52,6 +54,39 @@ const invokeController = async (handler) => {
   if (nextError) throw nextError;
 
   return { statusCode: res.statusCode, body };
+};
+
+const stubCourseSubcategories = (records = INITIAL_COURSE_SUBCATEGORIES) => {
+  const originalExists = CourseSubcategory.exists;
+  const originalFind = CourseSubcategory.find;
+  const normalized = records.map((record) => ({ isActive: true, ...record }));
+
+  CourseSubcategory.exists = async (filter) => normalized.find((record) => (
+    record.slug === filter.slug
+      && (filter.category === undefined || record.category === filter.category)
+      && (filter.isActive === undefined || record.isActive === filter.isActive)
+  )) || null;
+
+  CourseSubcategory.find = (filter = {}) => {
+    let result = normalized.filter((record) => (
+      (filter.isActive === undefined || record.isActive === filter.isActive)
+      && (filter.category === undefined || record.category === filter.category)
+    ));
+    const chain = {
+      select: () => chain,
+      sort: () => {
+        result = [...result].sort((a, b) => a.name.localeCompare(b.name) || a.slug.localeCompare(b.slug));
+        return chain;
+      },
+      lean: async () => result.map((record) => ({ ...record })),
+    };
+    return chain;
+  };
+
+  return () => {
+    CourseSubcategory.exists = originalExists;
+    CourseSubcategory.find = originalFind;
+  };
 };
 
 test('regex search text is escaped literally and handles non-string inputs safely', () => {
@@ -137,82 +172,67 @@ test('all newly protected paginated lists reject invalid boundaries', async () =
   }
 });
 
-test('Course STEAM taxonomy is centralized and enforces category/subcategory pairs', async () => {
-  assert.deepEqual(Object.keys(STEAM_SUBCATEGORIES), COURSE_CATEGORIES);
-  assert.equal(STEAM_SUBCATEGORIES.technology.includes('machine_learning'), true);
-  assert.equal(STEAM_SUBCATEGORIES.arts.includes('language_arts'), true);
-  assert.equal(STEAM_SUBCATEGORIES.mathematics.includes('calculus'), true);
+test('Course categories stay fixed while managed subcategories enforce active pairs', async () => {
+  const restore = stubCourseSubcategories();
+  try {
+    assert.deepEqual(COURSE_CATEGORIES, ['science', 'technology', 'engineering', 'arts', 'mathematics']);
+    assert.equal(INITIAL_COURSE_SUBCATEGORIES.length, 17);
 
-  const valid = await validate(courseValidator.create, {
-    body: {
-      title: 'Introduction to Machine Learning',
-      category: 'technology',
-      subcategory: 'machine_learning',
-    },
-  });
-  assert.equal(valid.isEmpty(), true);
+    const valid = await validate(courseValidator.create, {
+      body: { title: 'Introduction to Machine Learning', category: 'technology', subcategory: 'machine_learning' },
+    });
+    assert.equal(valid.isEmpty(), true);
 
-  const legacyCategory = await validate(courseValidator.create, {
-    body: {
-      title: 'Legacy Course',
-      category: 'programming',
-      subcategory: 'programming',
-    },
-  });
-  assert.equal(legacyCategory.isEmpty(), false);
+    const legacyCategory = await validate(courseValidator.create, {
+      body: { title: 'Legacy Course', category: 'programming', subcategory: 'programming' },
+    });
+    assert.equal(legacyCategory.isEmpty(), false);
 
-  const mismatched = await validate(courseValidator.create, {
-    body: {
-      title: 'Invalid Pair',
-      category: 'technology',
-      subcategory: 'calculus',
-    },
-  });
-  assert.equal(mismatched.isEmpty(), false);
+    const mismatched = await validate(courseValidator.create, {
+      body: { title: 'Invalid Pair', category: 'technology', subcategory: 'calculus' },
+    });
+    assert.equal(mismatched.isEmpty(), false);
 
-  await new Course({
-    title: 'Valid Model Taxonomy',
-    category: 'mathematics',
-    subcategory: 'calculus',
-  }).validate();
-
-  await assert.rejects(
-    new Course({
-      title: 'Invalid Model Taxonomy',
-      category: 'technology',
-      subcategory: 'calculus',
-    }).validate(),
-    /Course subcategory must belong to its category/
-  );
+    await new Course({
+      title: 'Valid Model Taxonomy', category: 'mathematics', subcategory: 'calculus',
+    }).validate();
+    await assert.rejects(
+      new Course({
+        title: 'Invalid Model Taxonomy', category: 'technology', subcategory: 'calculus',
+      }).validate(),
+      /active managed subcategory/
+    );
+  } finally {
+    restore();
+  }
 });
 
-test('Course taxonomy response derives all categories and subcategories from canonical constants', async () => {
-  const { statusCode, body } = await invokeController(courseController.getCourseTaxonomy);
-
-  assert.equal(statusCode, 200);
-  assert.equal(body.success, true);
-  assert.equal(body.message, 'Course taxonomy fetched successfully.');
-  assert.deepEqual(Object.keys(body.data), COURSE_CATEGORIES);
-
-  for (const category of COURSE_CATEGORIES) {
-    assert.deepEqual(body.data[category], STEAM_SUBCATEGORIES[category]);
-    assert.notStrictEqual(body.data[category], STEAM_SUBCATEGORIES[category]);
-  }
-
-  assert.deepEqual(body.data.technology, [
-    'programming',
-    'machine_learning',
-    'computer_literacy',
+test('Course taxonomy response is database-backed, active-only, sorted, and keeps empty categories', async () => {
+  const restore = stubCourseSubcategories([
+    { name: 'Programming', slug: 'programming', category: 'technology', isActive: true },
+    { name: 'Mobile Development', slug: 'mobile_development', category: 'technology', isActive: true },
+    { name: 'Biology', slug: 'biology', category: 'science', isActive: false },
   ]);
-  assert.deepEqual(body.data.science, STEAM_SUBCATEGORIES.science);
-  assert.equal(body.data.science.includes('biology'), true);
+  try {
+    const { statusCode, body } = await invokeController(courseController.getCourseTaxonomy);
 
-  const canonicalTechnology = [...STEAM_SUBCATEGORIES.technology];
-  body.data.technology.push('response_only_value');
-  assert.deepEqual(STEAM_SUBCATEGORIES.technology, canonicalTechnology);
+    assert.equal(statusCode, 200);
+    assert.equal(body.success, true);
+    assert.deepEqual(Object.keys(body.data), COURSE_CATEGORIES);
+    assert.deepEqual(body.data.technology, [
+      { name: 'Mobile Development', slug: 'mobile_development' },
+      { name: 'Programming', slug: 'programming' },
+    ]);
+    assert.deepEqual(body.data.science, []);
+    assert.deepEqual(body.data.engineering, []);
+  } finally {
+    restore();
+  }
 });
 
 test('GET /api/courses/taxonomy resolves before the dynamic course ID route', async (t) => {
+  const restore = stubCourseSubcategories();
+  t.after(restore);
   const app = express();
   app.use('/api/courses', courseRoutes);
 
@@ -228,69 +248,75 @@ test('GET /api/courses/taxonomy resolves before the dynamic course ID route', as
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.deepEqual(Object.keys(body.data), COURSE_CATEGORIES);
-  assert.equal(body.data.technology.includes('programming'), true);
-  assert.equal(body.data.science.includes('biology'), true);
+  assert.equal(body.data.technology.some((item) => item.slug === 'programming'), true);
+  assert.equal(body.data.science.some((item) => item.slug === 'biology'), true);
 });
 
-test('approved Science subcategories work across Course validation layers', async () => {
-  assert.equal(STEAM_SUBCATEGORIES.science.length, 5);
+test('managed Course subcategories work across create, update, query, and model validation', async () => {
+  const restore = stubCourseSubcategories();
+  try {
+    const scienceSlugs = INITIAL_COURSE_SUBCATEGORIES
+      .filter(({ category }) => category === 'science')
+      .map(({ slug }) => slug);
+    assert.equal(scienceSlugs.length, 5);
 
-  for (const subcategory of STEAM_SUBCATEGORIES.science) {
-    const body = {
-      title: `Science Course: ${subcategory}`,
-      category: 'science',
-      subcategory,
-    };
+    for (const subcategory of scienceSlugs) {
+      const body = { title: `Science Course: ${subcategory}`, category: 'science', subcategory };
+      assert.equal((await validate(courseValidator.create, { body })).isEmpty(), true);
+      assert.equal((await validate(courseValidator.update, {
+        params: { id: '507f1f77bcf86cd799439011' },
+        body: { category: body.category, subcategory },
+      })).isEmpty(), true);
+      assert.equal((await validate(courseValidator.listQuery, {
+        query: { category: body.category, subcategory },
+      })).isEmpty(), true);
+      await new Course(body).validate();
+    }
 
-    assert.equal((await validate(courseValidator.create, { body })).isEmpty(), true);
-    assert.equal((await validate(courseValidator.update, {
-      params: { id: '507f1f77bcf86cd799439011' },
-      body: { category: body.category, subcategory },
-    })).isEmpty(), true);
-    assert.equal((await validate(courseValidator.listQuery, {
-      query: { category: body.category, subcategory },
-    })).isEmpty(), true);
-
-    await new Course(body).validate();
-  }
-
-  for (const [category, subcategory] of [
-    ['science', 'programming'],
-    ['science', 'calculus'],
-    ['science', 'language_arts'],
-    ['technology', 'biology'],
-    ['mathematics', 'chemistry'],
-  ]) {
-    const body = { title: 'Invalid Science Pair', category, subcategory };
-
-    assert.equal((await validate(courseValidator.create, { body })).isEmpty(), false);
-    assert.equal((await validate(courseValidator.update, {
-      params: { id: '507f1f77bcf86cd799439011' },
-      body: { category, subcategory },
-    })).isEmpty(), false);
-    assert.equal((await validate(courseValidator.listQuery, {
-      query: { category, subcategory },
-    })).isEmpty(), false);
-    await assert.rejects(new Course(body).validate());
+    for (const [category, subcategory] of [
+      ['science', 'programming'],
+      ['science', 'calculus'],
+      ['technology', 'biology'],
+      ['mathematics', 'chemistry'],
+    ]) {
+      const body = { title: 'Invalid Managed Pair', category, subcategory };
+      assert.equal((await validate(courseValidator.create, { body })).isEmpty(), false);
+      assert.equal((await validate(courseValidator.update, {
+        params: { id: '507f1f77bcf86cd799439011' }, body: { category, subcategory },
+      })).isEmpty(), false);
+      assert.equal((await validate(courseValidator.listQuery, {
+        query: { category, subcategory },
+      })).isEmpty(), false);
+      await assert.rejects(new Course(body).validate());
+    }
+  } finally {
+    restore();
   }
 });
 
-test('Course taxonomy filters reject mismatched pairs', async () => {
-  assert.equal((await validate(courseValidator.listQuery, {
-    query: { category: 'technology', subcategory: 'programming' },
-  })).isEmpty(), true);
-
-  assert.equal((await validate(courseValidator.listQuery, {
-    query: { category: 'technology', subcategory: 'calculus' },
-  })).isEmpty(), false);
-
-  assert.equal((await validate(courseValidator.listQuery, {
-    query: { subcategory: 'not_a_subcategory' },
-  })).isEmpty(), false);
+test('Course taxonomy filters validate managed pairs and subcategory-only queries', async () => {
+  const restore = stubCourseSubcategories();
+  try {
+    assert.equal((await validate(courseValidator.listQuery, {
+      query: { category: 'technology', subcategory: 'programming' },
+    })).isEmpty(), true);
+    assert.equal((await validate(courseValidator.listQuery, {
+      query: { category: 'technology', subcategory: 'calculus' },
+    })).isEmpty(), false);
+    assert.equal((await validate(courseValidator.listQuery, {
+      query: { subcategory: 'programming' },
+    })).isEmpty(), true);
+    assert.equal((await validate(courseValidator.listQuery, {
+      query: { subcategory: 'not_a_subcategory' },
+    })).isEmpty(), false);
+  } finally {
+    restore();
+  }
 });
 
 test('Course partial taxonomy updates validate the final stored pair', async () => {
   const originalFindById = Course.findById;
+  const restoreSubcategories = stubCourseSubcategories();
   Course.findById = () => ({
     select: () => ({
       lean: async () => ({ category: 'technology', subcategory: 'programming' }),
@@ -321,6 +347,7 @@ test('Course partial taxonomy updates validate the final stored pair', async () 
     })).isEmpty(), true);
   } finally {
     Course.findById = originalFindById;
+    restoreSubcategories();
   }
 });
 

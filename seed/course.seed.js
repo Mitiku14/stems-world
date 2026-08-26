@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const mongoose = require('mongoose');
 const Course = require('../src/models/Course');
+const { ensureInitialCourseSubcategories } = require('./courseSubcategory.seed');
 
 /**
  * frontendId values match the courseData keys in the frontend:
@@ -261,6 +262,9 @@ const seedCourses = async () => {
 
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ MongoDB Connected');
+
+    await ensureInitialCourseSubcategories();
+    console.log('✅ Initial Course subcategories verified');
 
     let updatedCount = 0;
     for (const courseData of courses) {
