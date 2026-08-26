@@ -1,8 +1,33 @@
 const { body, query, param } = require('express-validator');
 const mongoose = require('mongoose');
-const { COURSE_CATEGORIES, COURSE_LEVELS } = require('../constants');
+const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, COURSE_LEVELS } = require('../constants');
 const Course = require('../models/Course');
 const Site = require('../models/Site');
+
+const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
+
+const validateTaxonomyPair = (category, subcategory) => {
+  if (STEAM_SUBCATEGORIES[category]?.includes(subcategory)) return true;
+  throw new Error(`Subcategory "${subcategory}" is not valid for category "${category}"`);
+};
+
+const validateUpdatedTaxonomy = async (payload, req) => {
+  const { category, subcategory } = payload;
+  if (category === undefined && subcategory === undefined) return true;
+
+  let finalCategory = category;
+  let finalSubcategory = subcategory;
+
+  if ((finalCategory === undefined || finalSubcategory === undefined)
+      && req.params?.id && mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const existing = await Course.findById(req.params.id).select('category subcategory').lean();
+    if (!existing) return true;
+    finalCategory ??= existing.category;
+    finalSubcategory ??= existing.subcategory;
+  }
+
+  return validateTaxonomyPair(finalCategory, finalSubcategory);
+};
 
 const validateCourseSites = async (sites) => {
   if (!sites || !Array.isArray(sites) || sites.length === 0) return true;
@@ -40,8 +65,12 @@ const create = [
   body('description').optional().trim()
     .isLength({ max: 2000 }).withMessage('Description cannot exceed 2000 characters'),
 
-  body('category').optional()
+  body('category').notEmpty().withMessage('Course category is required').bail()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
+
+  body('subcategory').notEmpty().withMessage('Course subcategory is required').bail()
+    .isIn(courseSubcategories).withMessage('Subcategory is not recognized').bail()
+    .custom((value, { req }) => validateTaxonomyPair(req.body.category, value)),
 
   body('level').optional()
     .isIn(COURSE_LEVELS).withMessage(`Level must be one of: ${COURSE_LEVELS.join(', ')}`),
@@ -118,6 +147,11 @@ const update = [
 
   body('category').optional()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
+
+  body('subcategory').optional()
+    .isIn(courseSubcategories).withMessage('Subcategory is not recognized'),
+
+  body().custom((payload, { req }) => validateUpdatedTaxonomy(payload, req)),
 
   body('level').optional()
     .isIn(COURSE_LEVELS).withMessage(`Level must be one of: ${COURSE_LEVELS.join(', ')}`),
@@ -227,6 +261,12 @@ const listQuery = [
   query('search').optional().isString().trim().isLength({ max: 100 }).withMessage('Search query cannot exceed 100 characters'),
   query('category').optional()
     .isIn(COURSE_CATEGORIES).withMessage(`Category must be one of: ${COURSE_CATEGORIES.join(', ')}`),
+  query('subcategory').optional()
+    .isIn(courseSubcategories).withMessage('Subcategory is not recognized'),
+  query().custom((values) => {
+    if (!values.category || !values.subcategory) return true;
+    return validateTaxonomyPair(values.category, values.subcategory);
+  }),
   query('level').optional()
     .isIn(COURSE_LEVELS).withMessage(`Level must be one of: ${COURSE_LEVELS.join(', ')}`),
 ];

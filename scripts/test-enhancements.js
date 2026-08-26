@@ -187,6 +187,7 @@ async function runEnhancementTests() {
 
   const csvCoursesRes = await request('GET', '/api/admin/export/courses', null, adminToken);
   ok('Export courses returns text/csv', csvCoursesRes.status === 200 && csvCoursesRes.headers['content-type']?.includes('text/csv'));
+  ok('Course CSV contains Category and Subcategory columns', typeof csvCoursesRes.body === 'string' && csvCoursesRes.body.includes('"Category","Subcategory"'));
 
   const studentExportRes = await request('GET', '/api/admin/export/students', null, studentToken);
   ok('Student blocked from CSV export (HTTP 403)', studentExportRes.status === 403);

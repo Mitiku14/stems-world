@@ -372,7 +372,10 @@ router.post('/admins', adminValidator.createAdmin, validate, adminController.cre
  *         schema: { type: string }
  *       - in: query
  *         name: category
- *         schema: { type: string }
+ *         schema: { $ref: '#/components/schemas/CourseCategory' }
+ *       - in: query
+ *         name: subcategory
+ *         schema: { $ref: '#/components/schemas/CourseSubcategory' }
  *       - in: query
  *         name: level
  *         schema: { type: string }

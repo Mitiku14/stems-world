@@ -1,4 +1,17 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES } = require('../constants');
+
+const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
+const courseTaxonomyProperties = Object.fromEntries(
+  COURSE_CATEGORIES.map((category) => [
+    category,
+    {
+      type: 'array',
+      items: { type: 'string', enum: STEAM_SUBCATEGORIES[category] },
+      example: [...STEAM_SUBCATEGORIES[category]],
+    },
+  ])
+);
 
 // Determine the correct server URL:
 // 1. API_URL env var (set this on Render to your deployed URL)
@@ -64,6 +77,27 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
         },
       },
       schemas: {
+        CourseCategory: {
+          type: 'string',
+          enum: COURSE_CATEGORIES,
+          example: 'technology',
+        },
+
+        CourseSubcategory: {
+          type: 'string',
+          enum: courseSubcategories,
+          example: 'machine_learning',
+          description: 'Controlled specialization that must belong to the selected Course category',
+        },
+
+        CourseTaxonomy: {
+          type: 'object',
+          description: 'Canonical Course category-to-subcategories mapping',
+          required: COURSE_CATEGORIES,
+          additionalProperties: false,
+          properties: courseTaxonomyProperties,
+        },
+
         // ── Success response wrapper ───────────────────────────────────────
         SuccessResponse: {
           type: 'object',
@@ -142,11 +176,8 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             _id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
             title: { type: 'string', example: 'Introduction to Machine Learning' },
             description: { type: 'string', example: 'Learn the foundations of machine learning.' },
-            category: {
-              type: 'string',
-              enum: ['programming', 'mathematics', 'language', 'science', 'other'],
-              example: 'programming',
-            },
+            category: { $ref: '#/components/schemas/CourseCategory' },
+            subcategory: { $ref: '#/components/schemas/CourseSubcategory' },
             level: {
               type: 'string',
               enum: ['beginner', 'intermediate', 'advanced', 'all'],

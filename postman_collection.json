@@ -601,6 +601,41 @@
       "description": "Public course discovery & admin course management",
       "item": [
         {
+          "name": "Get Course Taxonomy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/courses/taxonomy",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "courses",
+                "taxonomy"
+              ]
+            }
+          }
+        },
+        {
           "name": "List / Search / Filter Courses",
           "event": [
             {
@@ -623,7 +658,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{BASE_URL}}/api/courses?search=programming&category=programming&level=beginner&page=1&limit=10",
+              "raw": "{{BASE_URL}}/api/courses?search=programming&category=technology&subcategory=programming&level=beginner&page=1&limit=10",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -638,6 +673,10 @@
                 },
                 {
                   "key": "category",
+                  "value": "technology"
+                },
+                {
+                  "key": "subcategory",
                   "value": "programming"
                 },
                 {
@@ -767,7 +806,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Advanced Robotics & Automation\",\n  \"description\": \"Learn modern robotics systems and control software.\",\n  \"category\": \"science\",\n  \"level\": \"advanced\",\n  \"requiresDocument\": true,\n  \"imageUrl\": \"https://example.com/images/robotics.jpg\",\n  \"syllabus\": [\n    \"Robotics Fundamentals\",\n    \"Kinematics\",\n    \"ROS Setup\"\n  ],\n  \"instructor\": \"Dr. Alan Turing\",\n  \"duration\": \"10 weeks\",\n  \"season\": \"Fall 2026\",\n  \"maxStudents\": 25,\n  \"frontendId\": \"robotics-adv-1\"\n}"
+              "raw": "{\n  \"title\": \"Advanced Robotics & Automation\",\n  \"description\": \"Learn modern robotics systems and control software.\",\n  \"category\": \"engineering\",\n  \"subcategory\": \"interdisciplinary\",\n  \"level\": \"advanced\",\n  \"requiresDocument\": true,\n  \"imageUrl\": \"https://example.com/images/robotics.jpg\",\n  \"syllabus\": [\n    \"Robotics Fundamentals\",\n    \"Kinematics\",\n    \"ROS Setup\"\n  ],\n  \"instructor\": \"Dr. Alan Turing\",\n  \"duration\": \"10 weeks\",\n  \"season\": \"Fall 2026\",\n  \"maxStudents\": 25,\n  \"frontendId\": \"robotics-adv-1\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/courses",

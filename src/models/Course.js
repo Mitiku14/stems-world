@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
-const { COURSE_CATEGORIES, COURSE_LEVELS } = require('../constants');
+const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, COURSE_LEVELS } = require('../constants');
+
+const courseSubcategories = Object.values(STEAM_SUBCATEGORIES).flat();
 
 const resourceSchema = new mongoose.Schema(
   {
@@ -58,7 +60,23 @@ const courseSchema = new mongoose.Schema(
     category: {
       type: String,
       enum: COURSE_CATEGORIES,
-      default: 'other',
+      required: [true, 'Course category is required'],
+    },
+
+    subcategory: {
+      type: String,
+      required: [true, 'Course subcategory is required'],
+      enum: courseSubcategories,
+      validate: {
+        validator(value) {
+          const update = typeof this.getUpdate === 'function' ? this.getUpdate() : null;
+          const category = update
+            ? update.category ?? update.$set?.category
+            : this.category;
+          return STEAM_SUBCATEGORIES[category]?.includes(value) === true;
+        },
+        message: 'Course subcategory must belong to its category',
+      },
     },
 
     level: {
@@ -168,7 +186,7 @@ const courseSchema = new mongoose.Schema(
 
 courseSchema.index({ title: 'text', description: 'text' });
 courseSchema.index({ isActive: 1 });
-courseSchema.index({ category: 1 });
+courseSchema.index({ category: 1, subcategory: 1 });
 // frontendId index is handled by the field-level sparse:true + unique:true above
 
 module.exports = mongoose.model('Course', courseSchema);

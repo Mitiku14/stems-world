@@ -269,7 +269,7 @@ const run = async () => {
     // Create course with a valid relative imageUrl
     const r = await req('POST', '/api/courses', {
       title: `Test Course ${ts}`, description: 'Created by test script',
-      category: 'programming', level: 'beginner', requiresDocument: false,
+      category: 'technology', subcategory: 'programming', level: 'beginner', requiresDocument: false,
       imageUrl: '/cs/programming.jpg',
     }, adminToken);
     ok('POST /courses (admin) → 201', r.status === 201, 201, r.status);
@@ -281,7 +281,7 @@ const run = async () => {
     // Test validation for bad imageUrl
     const rVal = await req('POST', '/api/courses', {
       title: `Test Course Bad URL ${ts}`, description: 'Created by test script',
-      category: 'programming', level: 'beginner', requiresDocument: false,
+      category: 'technology', subcategory: 'programming', level: 'beginner', requiresDocument: false,
       imageUrl: 'not-a-valid-url-and-not-starting-with-slash'
     }, adminToken);
     ok('POST /courses with bad imageUrl → 422', rVal.status === 422, 422, rVal.status);

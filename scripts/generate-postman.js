@@ -218,17 +218,26 @@ const coursesFolder = {
   description: 'Public course discovery & admin course management',
   item: [
     {
+      name: 'Get Course Taxonomy',
+      event: [makeTest(200)],
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/courses/taxonomy', host: ['{{BASE_URL}}'], path: ['api', 'courses', 'taxonomy'] }
+      }
+    },
+    {
       name: 'List / Search / Filter Courses',
       event: [makeTest(200)],
       request: {
         method: 'GET',
         url: {
-          raw: '{{BASE_URL}}/api/courses?search=programming&category=programming&level=beginner&page=1&limit=10',
+          raw: '{{BASE_URL}}/api/courses?search=programming&category=technology&subcategory=programming&level=beginner&page=1&limit=10',
           host: ['{{BASE_URL}}'],
           path: ['api', 'courses'],
           query: [
             { key: 'search', value: 'programming' },
-            { key: 'category', value: 'programming' },
+            { key: 'category', value: 'technology' },
+            { key: 'subcategory', value: 'programming' },
             { key: 'level', value: 'beginner' },
             { key: 'page', value: '1' },
             { key: 'limit', value: '10' }
@@ -264,7 +273,8 @@ const coursesFolder = {
           raw: JSON.stringify({
             title: 'Advanced Robotics & Automation',
             description: 'Learn modern robotics systems and control software.',
-            category: 'science',
+            category: 'engineering',
+            subcategory: 'interdisciplinary',
             level: 'advanced',
             requiresDocument: true,
             imageUrl: 'https://example.com/images/robotics.jpg',

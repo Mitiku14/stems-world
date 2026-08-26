@@ -16,13 +16,34 @@ const { ROLES } = require('../constants');
 
 /**
  * @swagger
+ * /api/courses/taxonomy:
+ *   get:
+ *     summary: Get the canonical Course taxonomy
+ *     description: Returns the canonical Course category-to-subcategories mapping for building category and dependent subcategory selectors. No authentication required.
+ *     tags: [Courses]
+ *     responses:
+ *       200:
+ *         description: Course taxonomy fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Course taxonomy fetched successfully.' }
+ *                 data: { $ref: '#/components/schemas/CourseTaxonomy' }
+ */
+router.get('/taxonomy', courseController.getCourseTaxonomy);
+
+/**
+ * @swagger
  * /api/courses:
  *   get:
  *     summary: List all active courses
  *     description: >
  *       Returns a paginated list of all active courses.
  *       Supports **full-text search** on title and description,
- *       and **filtering** by category and level.
+ *       and **filtering** by category, subcategory, and level.
  *       No authentication required.
  *     tags: [Courses]
  *     parameters:
@@ -33,10 +54,12 @@ const { ROLES } = require('../constants');
  *         example: machine learning
  *       - in: query
  *         name: category
- *         schema:
- *           type: string
- *           enum: [programming, mathematics, language, science, other]
+ *         schema: { $ref: '#/components/schemas/CourseCategory' }
  *         description: Filter by course category
+ *       - in: query
+ *         name: subcategory
+ *         schema: { $ref: '#/components/schemas/CourseSubcategory' }
+ *         description: Filter by controlled specialization
  *       - in: query
  *         name: level
  *         schema:
@@ -140,7 +163,7 @@ router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, re
  *         application/json:
  *           schema:
  *             type: object
- *             required: [title]
+ *             required: [title, category, subcategory]
  *             properties:
  *               title:
  *                 type: string
@@ -151,9 +174,9 @@ router.get('/:courseId/resources', resourceValidator.courseIdParam, validate, re
  *                 maxLength: 2000
  *                 example: Deep dive into Python data structures, decorators, and async programming.
  *               category:
- *                 type: string
- *                 enum: [programming, mathematics, language, science, other]
- *                 example: programming
+ *                 $ref: '#/components/schemas/CourseCategory'
+ *               subcategory:
+ *                 $ref: '#/components/schemas/CourseSubcategory'
  *               level:
  *                 type: string
  *                 enum: [beginner, intermediate, advanced, all]
@@ -279,8 +302,9 @@ router.post(
  *                 type: string
  *                 maxLength: 2000
  *               category:
- *                 type: string
- *                 enum: [programming, mathematics, language, science, other]
+ *                 $ref: '#/components/schemas/CourseCategory'
+ *               subcategory:
+ *                 $ref: '#/components/schemas/CourseSubcategory'
  *               level:
  *                 type: string
  *                 enum: [beginner, intermediate, advanced, all]

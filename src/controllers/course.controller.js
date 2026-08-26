@@ -3,7 +3,7 @@ const Enrollment = require('../models/Enrollment');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { ENROLLMENT_STATUS } = require('../constants');
+const { COURSE_CATEGORIES, STEAM_SUBCATEGORIES, ENROLLMENT_STATUS } = require('../constants');
 
 const buildPagination = (total, page, limit) => ({
   total,
@@ -12,19 +12,28 @@ const buildPagination = (total, page, limit) => ({
   totalPages: Math.ceil(total / limit),
 });
 
+exports.getCourseTaxonomy = asyncHandler(async (_req, res) => {
+  const taxonomy = Object.fromEntries(
+    COURSE_CATEGORIES.map((category) => [category, [...STEAM_SUBCATEGORIES[category]]])
+  );
+
+  return res.json(new ApiResponse(200, 'Course taxonomy fetched successfully.', taxonomy));
+});
+
 exports.getCourses = asyncHandler(async (req, res) => {
-  const { search, category, level, page = 1, limit = 10 } = req.query;
+  const { search, category, subcategory, level, page = 1, limit = 10 } = req.query;
   const p = Number(page);
   const l = Number(limit);
 
   const filter = { isActive: true };
   if (category) filter.category = category;
+  if (subcategory) filter.subcategory = subcategory;
   if (level)    filter.level    = level;
   if (search)   filter.$text    = { $search: search };
 
   const [courses, total] = await Promise.all([
     Course.find(filter)
-      .select('frontendId title description category level requiresDocument imageUrl syllabus instructor duration requirements registrationOpenDate registrationCloseDate season maxStudents isActive createdAt')
+      .select('frontendId title description category subcategory level requiresDocument imageUrl syllabus instructor duration requirements registrationOpenDate registrationCloseDate season maxStudents isActive createdAt')
       .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)
@@ -48,7 +57,7 @@ exports.getCourse = asyncHandler(async (req, res) => {
 
 exports.createCourse = asyncHandler(async (req, res) => {
   const {
-    title, description, category, level, requiresDocument, imageUrl,
+    title, description, category, subcategory, level, requiresDocument, imageUrl,
     syllabus, instructor, duration, requirements,
     registrationOpenDate, registrationCloseDate, season, maxStudents, sites,
   } = req.body;
@@ -57,6 +66,7 @@ exports.createCourse = asyncHandler(async (req, res) => {
     title,
     description,
     category,
+    subcategory,
     level,
     requiresDocument: requiresDocument ?? false,
     imageUrl: imageUrl || null,
@@ -77,7 +87,7 @@ exports.createCourse = asyncHandler(async (req, res) => {
 
 exports.updateCourse = asyncHandler(async (req, res) => {
   const {
-    title, description, category, level, requiresDocument, imageUrl,
+    title, description, category, subcategory, level, requiresDocument, imageUrl,
     syllabus, instructor, duration, requirements,
     registrationOpenDate, registrationCloseDate, season, maxStudents, sites,
   } = req.body;
@@ -87,6 +97,7 @@ exports.updateCourse = asyncHandler(async (req, res) => {
   if (title !== undefined)               updates.title = title;
   if (description !== undefined)         updates.description = description;
   if (category !== undefined)            updates.category = category;
+  if (subcategory !== undefined)         updates.subcategory = subcategory;
   if (level !== undefined)               updates.level = level;
   if (requiresDocument !== undefined)    updates.requiresDocument = requiresDocument;
   if (imageUrl !== undefined)            updates.imageUrl = imageUrl || null;
@@ -99,6 +110,14 @@ exports.updateCourse = asyncHandler(async (req, res) => {
   if (season !== undefined)              updates.season = season || null;
   if (maxStudents !== undefined)         updates.maxStudents = maxStudents || null;
   if (sites !== undefined)               updates.sites = sites;
+
+  // Query validators need both values to enforce the final taxonomy pair safely.
+  if ((category === undefined) !== (subcategory === undefined)) {
+    const existing = await Course.findById(req.params.id).select('category subcategory').lean();
+    if (!existing) throw new ApiError(404, 'Course not found.');
+    updates.category = category ?? existing.category;
+    updates.subcategory = subcategory ?? existing.subcategory;
+  }
 
   const course = await Course.findByIdAndUpdate(
     req.params.id,

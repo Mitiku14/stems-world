@@ -21,8 +21,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# ─── Editor files ─────────────────────────────────────────
+# ─── Editor & Test files ─────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.code-workspace
+google-test.html
+

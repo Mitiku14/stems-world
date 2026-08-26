@@ -397,18 +397,19 @@ exports.createAdmin = asyncHandler(async (req, res) => {
 // ── Course Management ──────────────────────────────────────────────────────
 
 exports.getAllCourses = asyncHandler(async (req, res) => {
-  const { search, category, level, page = 1, limit = 10 } = req.query;
+  const { search, category, subcategory, level, page = 1, limit = 10 } = req.query;
   const p = Number(page);
   const l = Number(limit);
 
   const filter = {};  // No isActive filter — admin sees everything
   if (category) filter.category = category;
+  if (subcategory) filter.subcategory = subcategory;
   if (level) filter.level = level;
   if (search) filter.$text = { $search: search };
 
   const [courses, total] = await Promise.all([
     Course.find(filter)
-      .select('title description category level requiresDocument imageUrl isActive frontendId instructor duration season maxStudents createdAt')
+      .select('title description category subcategory level requiresDocument imageUrl isActive frontendId instructor duration season maxStudents createdAt')
       .sort(search ? { score: { $meta: 'textScore' } } : { createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)

@@ -92,7 +92,8 @@ const setupFixtures = async () => {
     course = await Course.create({
       title: `Postman Test Course ${Date.now()}`,
       description: 'Course created for Postman automated testing',
-      category: 'programming',
+      category: 'technology',
+      subcategory: 'programming',
       level: 'beginner',
       duration: '4 weeks',
       isActive: true,
@@ -125,7 +126,8 @@ const setupFixtures = async () => {
   const delCourse = await Course.create({
     title: `Postman Course To Delete ${Date.now()}`,
     description: 'Temporary course for delete test',
-    category: 'other',
+    category: 'technology',
+    subcategory: 'programming',
     level: 'beginner',
     isActive: true
   });
@@ -326,7 +328,8 @@ const runRequest = async (folderName, item) => {
     } else {
       const newActiveCourse = await Course.create({
         title: `Active Course For Enrollment ${Date.now()}`,
-        category: 'programming',
+        category: 'technology',
+        subcategory: 'programming',
         level: 'beginner',
         isActive: true
       });

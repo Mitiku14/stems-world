@@ -150,7 +150,7 @@ exports.exportCompetitionRegistrations = asyncHandler(async (req, res) => {
 
 exports.exportCourses = asyncHandler(async (_req, res) => {
   const courses = await Course.find()
-    .select('title frontendId category level instructor duration season maxStudents requiresDocument isActive createdAt')
+    .select('title frontendId category subcategory level instructor duration season maxStudents requiresDocument isActive createdAt')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -159,6 +159,7 @@ exports.exportCourses = asyncHandler(async (_req, res) => {
     'Title',
     'Frontend ID',
     'Category',
+    'Subcategory',
     'Level',
     'Instructor',
     'Duration',
@@ -174,6 +175,7 @@ exports.exportCourses = asyncHandler(async (_req, res) => {
     c.title || '',
     c.frontendId || '',
     c.category || '',
+    c.subcategory || '',
     c.level || '',
     c.instructor || '',
     c.duration || '',
