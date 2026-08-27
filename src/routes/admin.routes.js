@@ -613,6 +613,9 @@ router.get(
  *         name: status
  *         schema: { type: string, enum: [pending, accepted, rejected] }
  *       - in: query
+ *         name: progressionStatus
+ *         schema: { type: string, enum: [not_started, in_progress, eliminated, completed] }
+ *       - in: query
  *         name: search
  *         schema: { type: string }
  *       - in: query
@@ -623,6 +626,28 @@ router.get(
  *     responses:
  *       200:
  *         description: Registrations fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Registrations fetched successfully.' }
+ *                 data:
+ *                   type: object
+ *                   required: [registrations, pagination]
+ *                   properties:
+ *                     registrations:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/CompetitionRegistration' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
  */
 router.get(
   '/competition-registrations', 
@@ -647,6 +672,30 @@ router.get(
  *     responses:
  *       200:
  *         description: Registration accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Registration accepted.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     status: { type: string, enum: [accepted] }
+ *                     progressionStatus: { type: string, enum: [not_started, in_progress] }
+ *                     currentRound: { type: string, nullable: true }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
  */
 router.patch(
   '/competition-registrations/:id/approve', 
@@ -669,16 +718,41 @@ router.patch(
  *         required: true
  *         schema: { type: string }
  *     requestBody:
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [rejectionReason]
  *             properties:
  *               rejectionReason:
  *                 type: string
+ *                 maxLength: 500
  *     responses:
  *       200:
  *         description: Registration rejected
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Registration rejected.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     status: { type: string, enum: [rejected] }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
  */
 router.patch(
   '/competition-registrations/:id/reject', 
@@ -708,7 +782,9 @@ router.patch(
  *             type: object
  *             required: [roundId]
  *             properties:
- *               roundId: { type: string }
+ *               roundId:
+ *                 type: string
+ *                 description: The _id of the participant's current Competition round (Competition.rounds[i]._id). Normally send registration.currentRound.
  *     responses:
  *       200:
  *         description: Round passed successfully
@@ -769,7 +845,9 @@ router.patch(
  *             type: object
  *             required: [roundId]
  *             properties:
- *               roundId: { type: string }
+ *               roundId:
+ *                 type: string
+ *                 description: The _id of the participant's current Competition round (Competition.rounds[i]._id). Normally send registration.currentRound.
  *     responses:
  *       200:
  *         description: Participant failed round and is eliminated

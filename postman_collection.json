@@ -2018,7 +2018,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"National AI Hackathon 2026\",\n  \"description\": \"Annual machine learning hackathon for secondary students.\",\n  \"category\": \"steam_innovation\",\n  \"type\": \"team\",\n  \"scope\": \"national\",\n  \"registrationOpenDate\": \"2026-08-01T00:00:00.000Z\",\n  \"registrationCloseDate\": \"2026-10-01T00:00:00.000Z\",\n  \"eventStartDate\": \"2026-10-15T00:00:00.000Z\",\n  \"eventEndDate\": \"2026-10-17T00:00:00.000Z\",\n  \"location\": \"Main Science Hub, Addis Ababa\",\n  \"requirements\": [\n    \"High school students grade 9-12\",\n    \"Basic Python programming\",\n    \"Laptop\"\n  ],\n  \"rounds\": [\n    {\n      \"name\": \"Proposal Review\",\n      \"order\": 1\n    },\n    {\n      \"name\": \"Final Presentation\",\n      \"order\": 2\n    }\n  ],\n  \"maxRegistrations\": 100,\n  \"status\": \"published\",\n  \"organizer\": \"AFRISTEAM Platform\",\n  \"contactEmail\": \"hackathon@afristeam.org\"\n}"
+              "raw": "{\n  \"title\": \"National AI Hackathon 2026\",\n  \"description\": \"Annual machine learning hackathon for secondary students.\",\n  \"category\": \"steam_innovation\",\n  \"type\": \"team\",\n  \"scope\": \"national\",\n  \"registrationOpenDate\": \"2026-08-01T00:00:00.000Z\",\n  \"registrationCloseDate\": \"2026-10-01T00:00:00.000Z\",\n  \"eventStartDate\": \"2026-10-15T00:00:00.000Z\",\n  \"eventEndDate\": \"2026-10-17T00:00:00.000Z\",\n  \"location\": \"Main Science Hub, Addis Ababa\",\n  \"requirements\": [\n    \"High school students grade 9-12\",\n    \"Basic Python programming\",\n    \"Laptop\"\n  ],\n  \"rounds\": [\n    {\n      \"name\": \"Qualifier\",\n      \"order\": 1\n    },\n    {\n      \"name\": \"Semifinal\",\n      \"order\": 2\n    },\n    {\n      \"name\": \"Final\",\n      \"order\": 3\n    }\n  ],\n  \"maxRegistrations\": 100,\n  \"status\": \"published\",\n  \"organizer\": \"AFRISTEAM Platform\",\n  \"contactEmail\": \"hackathon@afristeam.org\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/competitions",
@@ -2473,6 +2473,7 @@
             ]
           },
           "request": {
+            "description": "Send the currentRound value returned by the registration API as roundId. Do not send the round order; the backend selects the next round.",
             "method": "PATCH",
             "header": [
               {
@@ -2531,6 +2532,7 @@
             ]
           },
           "request": {
+            "description": "Send the currentRound value returned by the registration API as roundId. Do not send the round order; the backend records elimination.",
             "method": "PATCH",
             "header": [
               {

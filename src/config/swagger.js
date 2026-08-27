@@ -412,6 +412,19 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
             competitionId: { type: 'string', example: '64a1b2c3d4e5f6789012abce' },
             competitionTitle: { type: 'string', example: 'National Mathematics Olympiad' },
+            competition: {
+              type: 'object',
+              nullable: true,
+              description: 'Authoritative Competition summary used to resolve currentRound and roundProgress round IDs for display.',
+              properties: {
+                _id: { type: 'string', example: '64a1b2c3d4e5f6789012abce' },
+                title: { type: 'string', example: 'National Mathematics Olympiad' },
+                rounds: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/RoundDefinition' },
+                },
+              },
+            },
             studentName: { type: 'string', example: 'Jane Doe' },
             email: { type: 'string', example: 'jane@example.com' },
             phone: { type: 'string', example: '+1234567890' },

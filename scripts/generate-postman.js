@@ -668,8 +668,9 @@ const competitionsFolder = {
             location: 'Main Science Hub, Addis Ababa',
             requirements: ['High school students grade 9-12', 'Basic Python programming', 'Laptop'],
             rounds: [
-              { name: 'Proposal Review', order: 1 },
-              { name: 'Final Presentation', order: 2 }
+              { name: 'Qualifier', order: 1 },
+              { name: 'Semifinal', order: 2 },
+              { name: 'Final', order: 3 }
             ],
             maxRegistrations: 100,
             status: 'published',
@@ -782,6 +783,7 @@ const competitionsFolder = {
       event: [makeTest(200)],
       auth: bearerAuth('admin_token'),
       request: {
+        description: 'Send the currentRound value returned by the registration API as roundId. Do not send the round order; the backend selects the next round.',
         method: 'PATCH',
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
@@ -796,6 +798,7 @@ const competitionsFolder = {
       event: [makeTest(200)],
       auth: bearerAuth('admin_token'),
       request: {
+        description: 'Send the currentRound value returned by the registration API as roundId. Do not send the round order; the backend records elimination.',
         method: 'PATCH',
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {

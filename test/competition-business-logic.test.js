@@ -825,6 +825,81 @@ test('real approval controller enforces active published state and handles round
   }
 });
 
+test('admin and student registration responses expose Competition rounds for currentRound display', async () => {
+  const originals = {
+    find: CompetitionRegistration.find,
+    countDocuments: CompetitionRegistration.countDocuments,
+  };
+  const roundIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+  const competition = {
+    _id: new mongoose.Types.ObjectId(),
+    title: 'Frontend Round Display Competition',
+    rounds: [
+      { _id: roundIds[0], name: 'Qualifier', order: 1 },
+      { _id: roundIds[1], name: 'Semifinal', order: 2 },
+      { _id: roundIds[2], name: 'Final', order: 3 },
+    ],
+  };
+  const registration = {
+    _id: new mongoose.Types.ObjectId(),
+    competition,
+    student: null,
+    fullName: 'Frontend Student',
+    email: 'frontend@example.com',
+    status: 'accepted',
+    progressionStatus: 'in_progress',
+    currentRound: roundIds[1],
+    roundProgress: [
+      { round: roundIds[0], status: 'passed' },
+      { round: roundIds[1], status: 'pending' },
+    ],
+    createdAt: new Date(),
+  };
+  const findQuery = () => {
+    const chain = {
+      populate() { return chain; },
+      sort() { return chain; },
+      skip() { return chain; },
+      limit() { return chain; },
+      lean: async () => [registration],
+    };
+    return chain;
+  };
+  CompetitionRegistration.find = findQuery;
+  CompetitionRegistration.countDocuments = async () => 1;
+
+  try {
+    const adminResult = await invokeHandler(compRegCtrl.getAllRegistrations, {
+      query: { page: '1', limit: '10' },
+    });
+    const adminRegistration = adminResult.body.data.registrations[0];
+    assert.equal(adminResult.status, 200);
+    assert.equal(String(adminRegistration.competitionId), String(competition._id));
+    assert.equal(adminRegistration.competitionTitle, competition.title);
+    assert.deepEqual(
+      adminRegistration.competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order })),
+      competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order }))
+    );
+    const currentRound = adminRegistration.competition.rounds.find(
+      ({ _id }) => String(_id) === String(adminRegistration.currentRound)
+    );
+    assert.deepEqual({ name: currentRound.name, order: currentRound.order }, { name: 'Semifinal', order: 2 });
+
+    const studentResult = await invokeHandler(compRegCtrl.getMyRegistrations, {
+      user: { _id: new mongoose.Types.ObjectId(), email: registration.email },
+    });
+    const studentRegistration = studentResult.body.data.registrations[0];
+    assert.equal(studentResult.status, 200);
+    assert.deepEqual(
+      studentRegistration.competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order })),
+      competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order }))
+    );
+  } finally {
+    CompetitionRegistration.find = originals.find;
+    CompetitionRegistration.countDocuments = originals.countDocuments;
+  }
+});
+
 test('real PASS and FAIL controllers enforce sequence, terminal transitions, and atomic decision conflicts', async () => {
   const originals = {
     findById: CompetitionRegistration.findById,
@@ -833,7 +908,7 @@ test('real PASS and FAIL controllers enforce sequence, terminal transitions, and
   let harness;
 
   const activate = ({ currentIndex = 0 } = {}) => {
-    const roundIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+    const roundIds = Array.from({ length: 3 }, () => new mongoose.Types.ObjectId());
     const rounds = roundIds.map((id, index) => ({ _id: id, name: `Round ${index + 1}`, order: index + 1 }));
     const state = {
       _id: new mongoose.Types.ObjectId(),
@@ -892,25 +967,34 @@ test('real PASS and FAIL controllers enforce sequence, terminal transitions, and
 
   try {
     activate();
-    const intermediate = await act(compRegCtrl.passRound, harness.roundIds[0]);
-    assert.equal(intermediate.status, 200);
+    const roundOnePass = await act(compRegCtrl.passRound, harness.roundIds[0]);
+    assert.equal(roundOnePass.status, 200);
     assert.equal(harness.state.progressionStatus, 'in_progress');
     assert.equal(String(harness.state.currentRound), String(harness.roundIds[1]));
     assert.deepEqual(harness.state.roundProgress.map(({ status }) => status), ['passed', 'pending']);
 
-    activate({ currentIndex: 1 });
-    const finalPass = await act(compRegCtrl.passRound, harness.roundIds[1]);
+    const roundTwoPass = await act(compRegCtrl.passRound, harness.roundIds[1]);
+    assert.equal(roundTwoPass.status, 200);
+    assert.equal(harness.state.progressionStatus, 'in_progress');
+    assert.equal(String(harness.state.currentRound), String(harness.roundIds[2]));
+    assert.deepEqual(harness.state.roundProgress.map(({ status }) => status), ['passed', 'passed', 'pending']);
+
+    const finalPass = await act(compRegCtrl.passRound, harness.roundIds[2]);
     assert.equal(finalPass.status, 200);
     assert.equal(harness.state.progressionStatus, 'completed');
     assert.equal(harness.state.currentRound, null);
-    assert.deepEqual(harness.state.roundProgress.map(({ status }) => status), ['passed', 'passed']);
+    assert.deepEqual(harness.state.roundProgress.map(({ status }) => status), ['passed', 'passed', 'passed']);
 
-    activate();
-    const failed = await act(compRegCtrl.failRound, harness.roundIds[0]);
-    assert.equal(failed.status, 200);
-    assert.equal(harness.state.progressionStatus, 'eliminated');
-    assert.equal(harness.state.currentRound, null);
-    assert.equal(harness.state.roundProgress[0].status, 'failed');
+    for (const currentIndex of [0, 1, 2]) {
+      activate({ currentIndex });
+      const failed = await act(compRegCtrl.failRound, harness.roundIds[currentIndex]);
+      assert.equal(failed.status, 200);
+      assert.equal(harness.state.progressionStatus, 'eliminated');
+      assert.equal(harness.state.currentRound, null);
+      assert.equal(harness.state.roundProgress[currentIndex].status, 'failed');
+      assert.equal((await act(compRegCtrl.passRound, harness.roundIds[currentIndex])).status, 409);
+      assert.equal((await act(compRegCtrl.failRound, harness.roundIds[currentIndex])).status, 409);
+    }
 
     activate();
     const skipped = await act(compRegCtrl.passRound, harness.roundIds[1]);
@@ -1066,6 +1150,80 @@ test('real Competition update controller preserves referenced round identity and
     assert.equal(noProgressResult.status, 200);
     assert.equal(noProgress.rounds.length, 3);
     assert.equal(noProgress.rounds.some(({ _id }) => originalIds.includes(String(_id))), false);
+  } finally {
+    mongoose.connection.transaction = originals.transaction;
+    Competition.findOneAndUpdate = originals.findOneAndUpdate;
+    CompetitionRegistration.exists = originals.registrationExists;
+  }
+});
+
+test('roundless Competition blocks adding rounds after acceptance but permits it before registrations', async () => {
+  const originals = {
+    transaction: mongoose.connection.transaction,
+    findOneAndUpdate: Competition.findOneAndUpdate,
+    registrationExists: CompetitionRegistration.exists,
+  };
+  let currentCompetition;
+  let hasAcceptedRegistration;
+  mongoose.connection.transaction = async (callback) => callback({ isolated: true });
+  Competition.findOneAndUpdate = async () => currentCompetition;
+  CompetitionRegistration.exists = (filter) => ({
+    session: async () => (
+      filter.status === 'accepted' && hasAcceptedRegistration
+        ? { _id: new mongoose.Types.ObjectId() }
+        : null
+    ),
+  });
+
+  const makeRoundlessCompetition = () => {
+    const competition = Competition.hydrate({
+      _id: new mongoose.Types.ObjectId(),
+      title: 'Roundless Competition Update Test',
+      category: 'olympiad',
+      type: 'individual',
+      scope: 'national',
+      ...validDates,
+      rounds: [],
+      status: 'published',
+      isActive: true,
+    });
+    competition.saveCalls = 0;
+    competition.save = async function saveWithoutDatabase() {
+      this.saveCalls += 1;
+      await this.validate();
+      return this;
+    };
+    return competition;
+  };
+  const newRounds = [
+    { name: 'Qualifier', order: 1 },
+    { name: 'Semifinal', order: 2 },
+    { name: 'Final', order: 3 },
+  ];
+  const update = (competition) => {
+    currentCompetition = competition;
+    return invokeHandler(compCtrl.updateCompetition, {
+      params: { id: String(competition._id) },
+      body: { rounds: newRounds },
+    });
+  };
+
+  try {
+    hasAcceptedRegistration = true;
+    const blockedCompetition = makeRoundlessCompetition();
+    const blocked = await update(blockedCompetition);
+    assert.equal(blocked.status, 409);
+    assert.match(blocked.error.message, /accepted.*roundless competition/i);
+    assert.equal(blockedCompetition.rounds.length, 0);
+    assert.equal(blockedCompetition.saveCalls, 0);
+
+    hasAcceptedRegistration = false;
+    const editableCompetition = makeRoundlessCompetition();
+    const allowed = await update(editableCompetition);
+    assert.equal(allowed.status, 200);
+    assert.equal(editableCompetition.rounds.length, 3);
+    assert.deepEqual(editableCompetition.rounds.map(({ name, order }) => ({ name, order })), newRounds);
+    assert.equal(editableCompetition.saveCalls, 1);
   } finally {
     mongoose.connection.transaction = originals.transaction;
     Competition.findOneAndUpdate = originals.findOneAndUpdate;
@@ -1576,7 +1734,7 @@ test('real admin Competition list controller returns public and non-public lifec
   }
 });
 
-test('admin Competition list route and completed Competition Swagger contracts are exposed', () => {
+test('Competition frontend Swagger and Postman contracts expose round definitions and currentRound guidance', () => {
   const routes = adminRoutes.stack
     .filter((layer) => layer.route)
     .map((layer) => ({ path: layer.route.path, methods: Object.keys(layer.route.methods) }));
@@ -1592,6 +1750,10 @@ test('admin Competition list route and completed Competition Swagger contracts a
     swaggerSpec.components.schemas.CompetitionRegistration.properties.roundProgress.items.$ref,
     '#/components/schemas/RoundProgress'
   );
+  assert.equal(
+    swaggerSpec.components.schemas.CompetitionRegistration.properties.competition.properties.rounds.items.$ref,
+    '#/components/schemas/RoundDefinition'
+  );
   const registrationOperation = swaggerSpec.paths['/api/competitions/{id}/register'].post;
   assert.equal(Object.hasOwn(registrationOperation, 'security'), false);
   assert.deepEqual(swaggerSpec.components.schemas.Competition.properties.isActive, {
@@ -1602,9 +1764,23 @@ test('admin Competition list route and completed Competition Swagger contracts a
   assert.ok(swaggerSpec.paths['/api/admin/competitions'].get);
   assert.ok(swaggerSpec.paths['/api/competitions/registrations/my'].get.responses['200'].content);
 
+  const adminRegistrations = swaggerSpec.paths['/api/admin/competition-registrations'].get;
+  assert.equal(adminRegistrations.parameters.some(({ name }) => name === 'progressionStatus'), true);
+  assert.equal(
+    adminRegistrations.responses['200'].content['application/json'].schema
+      .properties.data.properties.registrations.items.$ref,
+    '#/components/schemas/CompetitionRegistration'
+  );
+  assert.ok(swaggerSpec.paths['/api/admin/competition-registrations/{id}/approve'].patch.responses['409']);
+  assert.ok(swaggerSpec.paths['/api/admin/competition-registrations/{id}/reject'].patch.responses['422']);
+
   for (const action of ['pass', 'fail']) {
     const operation = swaggerSpec.paths[`/api/admin/competition-registrations/{id}/round/${action}`].patch;
     assert.deepEqual(Object.keys(operation.responses).sort(), ['200', '400', '401', '403', '404', '409', '422']);
+    assert.match(
+      operation.requestBody.content['application/json'].schema.properties.roundId.description,
+      /Competition\.rounds\[i\]\._id.*registration\.currentRound/
+    );
   }
 
   const collection = JSON.parse(fs.readFileSync(path.join(__dirname, '../postman_collection.json'), 'utf8'));
@@ -1617,6 +1793,19 @@ test('admin Competition list route and completed Competition Swagger contracts a
   const adminList = requests.find(({ name }) => name === 'Admin List All Competitions');
   assert.equal(adminList.request.method, 'GET');
   assert.equal(adminList.request.url.raw, '{{BASE_URL}}/api/admin/competitions?page=1&limit=10');
+
+  const createCompetition = requests.find(({ name }) => name === 'Admin Create Competition');
+  const createBody = JSON.parse(createCompetition.request.body.raw);
+  assert.deepEqual(createBody.rounds.map(({ name, order }) => ({ name, order })), [
+    { name: 'Qualifier', order: 1 },
+    { name: 'Semifinal', order: 2 },
+    { name: 'Final', order: 3 },
+  ]);
+  for (const action of ['Pass', 'Fail']) {
+    const request = requests.find(({ name }) => name === `Admin ${action} Competition Registration Round`);
+    assert.deepEqual(JSON.parse(request.request.body.raw), { roundId: '{{round_id}}' });
+    assert.match(request.request.description, /currentRound.*roundId.*round order/);
+  }
 });
 
 async function validationStatus(chains, req) {

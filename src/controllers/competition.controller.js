@@ -176,6 +176,23 @@ exports.updateCompetition = asyncHandler(async (req, res) => {
 
     // Rule: Cannot alter structural identity or order of rounds if any participant has roundProgress
     if (data.rounds !== undefined) {
+      const existingRounds = existing.rounds || [];
+      const newRounds = data.rounds || [];
+
+      if (existingRounds.length === 0 && newRounds.length > 0) {
+        const hasAcceptedRoundlessRegistration = await CompetitionRegistration.exists({
+          competition: existing._id,
+          status: 'accepted',
+        }).session(session);
+
+        if (hasAcceptedRoundlessRegistration) {
+          throw new ApiError(
+            409,
+            'Cannot add rounds after registrations have been accepted for a roundless competition.'
+          );
+        }
+      }
+
       const hasProgress = await CompetitionRegistration.exists({
         competition: existing._id,
         $or: [
@@ -185,9 +202,6 @@ exports.updateCompetition = asyncHandler(async (req, res) => {
       }).session(session);
 
       if (hasProgress) {
-        const existingRounds = existing.rounds || [];
-        const newRounds = data.rounds || [];
-
         // Structural check: lengths, positions, IDs, and orders must remain stable.
         // Restore omitted IDs so a safe rename does not regenerate embedded identity.
         let isStructuralMismatch = existingRounds.length !== newRounds.length;

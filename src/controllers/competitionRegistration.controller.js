@@ -44,10 +44,24 @@ const assertRegistrationTypePayload = (competition, teamName, teamMembers) => {
   }
 };
 
+const flattenCompetition = (competition) => {
+  if (!competition?._id) return null;
+  return {
+    _id: competition._id,
+    title: competition.title,
+    rounds: (competition.rounds || []).map((round) => ({
+      _id: round._id,
+      name: round.name,
+      order: round.order,
+    })),
+  };
+};
+
 const flattenRegistration = (r) => ({
   id: r._id,
   competitionId: r.competition?._id || r.competition,
   competitionTitle: r.competition?.title || '—',
+  competition: flattenCompetition(r.competition),
   studentName: r.student?.name || r.fullName || '—',
   email: r.student?.email || r.email || '—',
   phone: r.phone,
@@ -195,7 +209,7 @@ exports.getMyRegistrations = asyncHandler(async (req, res) => {
   };
 
   const registrations = await CompetitionRegistration.find(filter)
-    .populate('competition', 'title category type scope eventStartDate status')
+    .populate('competition', 'title category type scope eventStartDate status rounds')
     .sort({ createdAt: -1 })
     .lean();
 
