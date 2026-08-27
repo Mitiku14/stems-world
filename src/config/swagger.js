@@ -334,34 +334,85 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
         },
 
         // ── Competition ──────────────────────────────────────────────────────
+        RoundDefinition: {
+          type: 'object',
+          required: ['name', 'order'],
+          properties: {
+            _id: {
+              type: 'string',
+              example: '64a1b2c3d4e5f6789012abcd',
+              description: 'Stable embedded round ID. Preserve this value when updating rounds after progression exists.',
+            },
+            name: { type: 'string', maxLength: 100, example: 'Qualifier' },
+            order: { type: 'integer', minimum: 1, example: 1 },
+          },
+        },
+
+        RoundProgress: {
+          type: 'object',
+          required: ['round', 'status'],
+          properties: {
+            round: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            status: { type: 'string', enum: ['pending', 'passed', 'failed'], example: 'pending' },
+            reviewedBy: { type: 'string', nullable: true, example: '64a1b2c3d4e5f6789012abce' },
+            reviewedAt: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+
         Competition: {
           type: 'object',
           properties: {
             title: { type: 'string', example: 'National Coding Hackathon' },
             description: { type: 'string', example: 'Annual hackathon for schools.' },
-            type: { type: 'string', enum: ['competition', 'hackathon', 'workshop', 'training', 'event'] },
+            category: { type: 'string', enum: ['steam_innovation', 'olympiad'], example: 'olympiad' },
+            type: { type: 'string', enum: ['individual', 'team'], example: 'individual' },
             scope: { type: 'string', enum: ['local', 'national', 'international'] },
-            registrationOpenDate: { type: 'string', format: 'date-time' },
-            registrationCloseDate: { type: 'string', format: 'date-time' },
-            eventStartDate: { type: 'string', format: 'date-time' },
-            eventEndDate: { type: 'string', format: 'date-time' },
+            registrationOpenDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Required on create and must be earlier than registrationCloseDate',
+            },
+            registrationCloseDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Required on create and must not be later than eventStartDate when provided',
+            },
+            eventStartDate: { type: 'string', format: 'date-time', nullable: true },
+            eventEndDate: { type: 'string', format: 'date-time', nullable: true },
             location: { type: 'string', example: 'Main Campus' },
-            eligibility: { type: 'string', example: 'Open to all high school students' },
             requirements: { type: 'array', items: { type: 'string' } },
-            maxParticipants: { type: 'integer', example: 100 },
-            status: { type: 'string', enum: ['draft', 'upcoming', 'open', 'closed', 'completed', 'cancelled'] },
+            rounds: {
+              type: 'array',
+              maxItems: 20,
+              description: 'Ordered embedded rounds. Existing _id values remain stable once participant progression references them.',
+              items: { $ref: '#/components/schemas/RoundDefinition' },
+            },
+            maxRegistrations: { type: 'integer', nullable: true, minimum: 1, example: 100 },
+            status: { type: 'string', enum: ['draft', 'published', 'completed', 'cancelled'], example: 'published' },
+            isActive: { type: 'boolean', example: true },
             organizer: { type: 'string', example: 'AfriSTEAM' },
             contactEmail: { type: 'string', example: 'support@afristeam.com' },
           },
+        },
+
+        CompetitionCreateInput: {
+          allOf: [
+            { $ref: '#/components/schemas/Competition' },
+            {
+              type: 'object',
+              required: ['title', 'category', 'type', 'scope', 'registrationOpenDate', 'registrationCloseDate'],
+            },
+          ],
         },
 
         // ── Competition Registration ─────────────────────────────────────────
         CompetitionRegistration: {
           type: 'object',
           properties: {
-            competition: { type: 'string', example: '64a1b2...' },
-            student: { type: 'string', nullable: true, example: '64a1b2...' },
-            fullName: { type: 'string', example: 'Jane Doe' },
+            id: { type: 'string', example: '64a1b2c3d4e5f6789012abcd' },
+            competitionId: { type: 'string', example: '64a1b2c3d4e5f6789012abce' },
+            competitionTitle: { type: 'string', example: 'National Mathematics Olympiad' },
+            studentName: { type: 'string', example: 'Jane Doe' },
             email: { type: 'string', example: 'jane@example.com' },
             phone: { type: 'string', example: '+1234567890' },
             grade: { type: 'string', example: '11th Grade' },
@@ -371,6 +422,15 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             teamName: { type: 'string', example: 'Code Ninjas' },
             teamMembers: { type: 'array', items: { type: 'string' } },
             status: { type: 'string', enum: ['pending', 'accepted', 'rejected'] },
+            progressionStatus: { type: 'string', enum: ['not_started', 'in_progress', 'eliminated', 'completed'], example: 'in_progress' },
+            currentRound: { type: 'string', nullable: true, example: '64a1b2c3d4e5f6789012abcd' },
+            roundProgress: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/RoundProgress' },
+            },
+            registeredAt: { type: 'string', format: 'date-time' },
+            rejectionReason: { type: 'string', nullable: true },
+            reviewedAt: { type: 'string', format: 'date-time', nullable: true },
           },
         },
 

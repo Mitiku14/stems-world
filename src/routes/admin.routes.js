@@ -4,6 +4,7 @@ const { param, query } = require('express-validator');
 const mongoose = require('mongoose');
 
 const adminController      = require('../controllers/admin.controller');
+const competitionController = require('../controllers/competition.controller');
 const contactController    = require('../controllers/contact.controller');
 const siteController       = require('../controllers/site.controller');
 const compRegController    = require('../controllers/competitionRegistration.controller');
@@ -451,6 +452,19 @@ router.get(
  *     responses:
  *       201:
  *         description: Course subcategory created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Course subcategory created successfully.' }
+ *                 data: { $ref: '#/components/schemas/CourseSubcategory' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  *       409:
  *         description: Course subcategory slug already exists
  *       422:
@@ -533,6 +547,55 @@ router.patch(
   courseSubcategoryValidator.subcategoryIdParam,
   validate,
   courseSubcategoryController.toggleCourseSubcategoryStatus
+);
+
+// ── Competition Management ─────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/competitions:
+ *   get:
+ *     summary: List all competitions for admin management
+ *     description: Returns draft, published, completed, cancelled, active, and inactive competitions.
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParam'
+ *       - $ref: '#/components/parameters/LimitParam'
+ *     responses:
+ *       200:
+ *         description: Competitions fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Competitions fetched successfully.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     competitions:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/Competition' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.get(
+  '/competitions',
+  [
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  ],
+  validate,
+  competitionController.getAllCompetitions
 );
 
 // ── Competition Registration Management ────────────────────────────────────
@@ -623,6 +686,129 @@ router.patch(
   validate, 
   compRegController.rejectRegistration
 );
+
+/**
+ * @swagger
+ * /api/admin/competition-registrations/{id}/round/pass:
+ *   patch:
+ *     summary: Pass current round for a participant registration
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roundId]
+ *             properties:
+ *               roundId: { type: string }
+ *     responses:
+ *       200:
+ *         description: Round passed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Participant passed round.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     progressionStatus: { type: string, enum: [in_progress, completed] }
+ *                     currentRound: { type: string, nullable: true }
+ *                     roundProgress:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/RoundProgress' }
+ *       400:
+ *         description: Competition lifecycle state does not allow round progression
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.patch(
+  '/competition-registrations/:id/round/pass',
+  compRegValidator.roundActionRules,
+  validate,
+  compRegController.passRound
+);
+
+/**
+ * @swagger
+ * /api/admin/competition-registrations/{id}/round/fail:
+ *   patch:
+ *     summary: Fail current round for a participant registration
+ *     tags: [Admin — Competitions]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roundId]
+ *             properties:
+ *               roundId: { type: string }
+ *     responses:
+ *       200:
+ *         description: Participant failed round and is eliminated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Participant failed round and is eliminated.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     progressionStatus: { type: string, enum: [eliminated] }
+ *                     currentRound: { type: string, nullable: true }
+ *                     roundProgress:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/RoundProgress' }
+ *       400:
+ *         description: Competition lifecycle state does not allow round progression
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+router.patch(
+  '/competition-registrations/:id/round/fail',
+  compRegValidator.roundActionRules,
+  validate,
+  compRegController.failRound
+);
+
 
 
 // ── Site Management ────────────────────────────────────────────────────────

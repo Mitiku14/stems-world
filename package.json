@@ -11,6 +11,7 @@
     "dev": "nodemon server.js",
     "seed:courses": "node seed/course.seed.js",
     "migrate:course-subcategories": "node scripts/migrate-course-subcategories.js --confirm-development",
+    "migrate:competitions": "node scripts/migrate-competitions.js --confirm-development",
     "seed:admin": "node seed/admin.seed.js",
     "test": "node --test test/*.test.js"
   },

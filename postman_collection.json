@@ -62,6 +62,11 @@
       "type": "string"
     },
     {
+      "key": "round_id",
+      "value": "64a1b2c3d4e5f6789012abd6",
+      "type": "string"
+    },
+    {
       "key": "site_id",
       "value": "64a1b2c3d4e5f6789012abd2",
       "type": "string"
@@ -1804,7 +1809,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{BASE_URL}}/api/competitions?type=competition&scope=national&page=1&limit=10",
+              "raw": "{{BASE_URL}}/api/competitions?category=steam_innovation&type=team&scope=national&page=1&limit=10",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -1814,8 +1819,12 @@
               ],
               "query": [
                 {
+                  "key": "category",
+                  "value": "steam_innovation"
+                },
+                {
                   "key": "type",
-                  "value": "competition"
+                  "value": "team"
                 },
                 {
                   "key": "scope",
@@ -1864,6 +1873,61 @@
                 "api",
                 "competitions",
                 "{{competition_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin List All Competitions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/competitions?page=1&limit=10",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "competitions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             }
           }
@@ -1954,7 +2018,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"National AI Hackathon 2026\",\n  \"description\": \"Annual machine learning hackathon for secondary students.\",\n  \"type\": \"hackathon\",\n  \"scope\": \"national\",\n  \"registrationOpenDate\": \"2026-08-01T00:00:00.000Z\",\n  \"registrationCloseDate\": \"2026-10-01T00:00:00.000Z\",\n  \"eventStartDate\": \"2026-10-15T00:00:00.000Z\",\n  \"eventEndDate\": \"2026-10-17T00:00:00.000Z\",\n  \"location\": \"Main Science Hub, Addis Ababa\",\n  \"eligibility\": \"High school students grade 9-12\",\n  \"requirements\": [\n    \"Basic Python programming\",\n    \"Laptop\"\n  ],\n  \"maxParticipants\": 100,\n  \"status\": \"open\",\n  \"organizer\": \"AFRISTEAM Platform\",\n  \"contactEmail\": \"hackathon@afristeam.org\"\n}"
+              "raw": "{\n  \"title\": \"National AI Hackathon 2026\",\n  \"description\": \"Annual machine learning hackathon for secondary students.\",\n  \"category\": \"steam_innovation\",\n  \"type\": \"team\",\n  \"scope\": \"national\",\n  \"registrationOpenDate\": \"2026-08-01T00:00:00.000Z\",\n  \"registrationCloseDate\": \"2026-10-01T00:00:00.000Z\",\n  \"eventStartDate\": \"2026-10-15T00:00:00.000Z\",\n  \"eventEndDate\": \"2026-10-17T00:00:00.000Z\",\n  \"location\": \"Main Science Hub, Addis Ababa\",\n  \"requirements\": [\n    \"High school students grade 9-12\",\n    \"Basic Python programming\",\n    \"Laptop\"\n  ],\n  \"rounds\": [\n    {\n      \"name\": \"Proposal Review\",\n      \"order\": 1\n    },\n    {\n      \"name\": \"Final Presentation\",\n      \"order\": 2\n    }\n  ],\n  \"maxRegistrations\": 100,\n  \"status\": \"published\",\n  \"organizer\": \"AFRISTEAM Platform\",\n  \"contactEmail\": \"hackathon@afristeam.org\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/competitions",
@@ -2008,7 +2072,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"National AI Hackathon 2026 (Updated)\",\n  \"maxParticipants\": 150\n}"
+              "raw": "{\n  \"title\": \"National AI Hackathon 2026 (Updated)\",\n  \"maxRegistrations\": 150\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/competitions/{{competition_id}}",
@@ -2276,6 +2340,52 @@
           }
         },
         {
+          "name": "Get My Competition Registrations (Student)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{student_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BASE_URL}}/api/competitions/registrations/my",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "competitions",
+                "registrations",
+                "my"
+              ]
+            }
+          }
+        },
+        {
           "name": "Admin Reject Competition Registration",
           "event": [
             {
@@ -2328,6 +2438,122 @@
                 "competition-registrations",
                 "{{comp_reg_id}}",
                 "reject"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Pass Competition Registration Round",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roundId\": \"{{round_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/competition-registrations/{{comp_reg_id}}/round/pass",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "competition-registrations",
+                "{{comp_reg_id}}",
+                "round",
+                "pass"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin Fail Competition Registration Round",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response is valid JSON wrapper\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('success');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{admin_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roundId\": \"{{round_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/admin/competition-registrations/{{comp_reg_id}}/round/fail",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "competition-registrations",
+                "{{comp_reg_id}}",
+                "round",
+                "fail"
               ]
             }
           }

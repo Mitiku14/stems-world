@@ -148,14 +148,19 @@ const setupFixtures = async () => {
   siteId = site._id.toString();
 
   // 5. Setup Competition
-  let comp = await Competition.findOne({ status: 'open', isActive: true });
+  let comp = await Competition.findOne({ status: 'published', isActive: true });
   if (!comp) {
     comp = await Competition.create({
       title: `Postman Hackathon ${Date.now()}`,
       description: 'Postman hackathon test event',
-      type: 'hackathon',
+      category: 'steam_innovation',
+      type: 'team',
       scope: 'national',
-      status: 'open',
+      registrationOpenDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      registrationCloseDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      eventStartDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
+      eventEndDate: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
+      status: 'published',
       isActive: true
     });
   }
@@ -362,9 +367,14 @@ const runRequest = async (folderName, item) => {
     // Create a fresh competition so registration test doesn't duplicate
     const freshComp = await Competition.create({
       title: `Registration Competition ${Date.now()}`,
-      type: 'competition',
+      category: 'steam_innovation',
+      type: 'team',
       scope: 'national',
-      status: 'open',
+      registrationOpenDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      registrationCloseDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      eventStartDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
+      eventEndDate: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
+      status: 'published',
       isActive: true
     });
     const testUrl = `${BASE_URL}/api/competitions/${freshComp._id}/register`;

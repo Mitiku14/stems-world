@@ -20,6 +20,7 @@ const collection = {
     { key: 'enrollment_id', value: '64a1b2c3d4e5f6789012abcf', type: 'string' },
     { key: 'competition_id', value: '64a1b2c3d4e5f6789012abd0', type: 'string' },
     { key: 'comp_reg_id', value: '64a1b2c3d4e5f6789012abd1', type: 'string' },
+    { key: 'round_id', value: '64a1b2c3d4e5f6789012abd6', type: 'string' },
     { key: 'site_id', value: '64a1b2c3d4e5f6789012abd2', type: 'string' },
     { key: 'notification_id', value: '64a1b2c3d4e5f6789012abd3', type: 'string' },
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', type: 'string' },
@@ -584,11 +585,12 @@ const competitionsFolder = {
       request: {
         method: 'GET',
         url: {
-          raw: '{{BASE_URL}}/api/competitions?type=competition&scope=national&page=1&limit=10',
+          raw: '{{BASE_URL}}/api/competitions?category=steam_innovation&type=team&scope=national&page=1&limit=10',
           host: ['{{BASE_URL}}'],
           path: ['api', 'competitions'],
           query: [
-            { key: 'type', value: 'competition' },
+            { key: 'category', value: 'steam_innovation' },
+            { key: 'type', value: 'team' },
             { key: 'scope', value: 'national' },
             { key: 'page', value: '1' },
             { key: 'limit', value: '10' }
@@ -602,6 +604,23 @@ const competitionsFolder = {
       request: {
         method: 'GET',
         url: { raw: '{{BASE_URL}}/api/competitions/{{competition_id}}', host: ['{{BASE_URL}}'], path: ['api', 'competitions', '{{competition_id}}'] }
+      }
+    },
+    {
+      name: 'Admin List All Competitions',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'GET',
+        url: {
+          raw: '{{BASE_URL}}/api/admin/competitions?page=1&limit=10',
+          host: ['{{BASE_URL}}'],
+          path: ['api', 'admin', 'competitions'],
+          query: [
+            { key: 'page', value: '1' },
+            { key: 'limit', value: '10' }
+          ]
+        }
       }
     },
     {
@@ -639,17 +658,21 @@ const competitionsFolder = {
           raw: JSON.stringify({
             title: 'National AI Hackathon 2026',
             description: 'Annual machine learning hackathon for secondary students.',
-            type: 'hackathon',
+            category: 'steam_innovation',
+            type: 'team',
             scope: 'national',
             registrationOpenDate: '2026-08-01T00:00:00.000Z',
             registrationCloseDate: '2026-10-01T00:00:00.000Z',
             eventStartDate: '2026-10-15T00:00:00.000Z',
             eventEndDate: '2026-10-17T00:00:00.000Z',
             location: 'Main Science Hub, Addis Ababa',
-            eligibility: 'High school students grade 9-12',
-            requirements: ['Basic Python programming', 'Laptop'],
-            maxParticipants: 100,
-            status: 'open',
+            requirements: ['High school students grade 9-12', 'Basic Python programming', 'Laptop'],
+            rounds: [
+              { name: 'Proposal Review', order: 1 },
+              { name: 'Final Presentation', order: 2 }
+            ],
+            maxRegistrations: 100,
+            status: 'published',
             organizer: 'AFRISTEAM Platform',
             contactEmail: 'hackathon@afristeam.org'
           }, null, 2)
@@ -666,7 +689,7 @@ const competitionsFolder = {
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
           mode: 'raw',
-          raw: JSON.stringify({ title: 'National AI Hackathon 2026 (Updated)', maxParticipants: 150 }, null, 2)
+          raw: JSON.stringify({ title: 'National AI Hackathon 2026 (Updated)', maxRegistrations: 150 }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/competitions/{{competition_id}}', host: ['{{BASE_URL}}'], path: ['api', 'competitions', '{{competition_id}}'] }
       }
@@ -732,6 +755,15 @@ const competitionsFolder = {
       }
     },
     {
+      name: 'Get My Competition Registrations (Student)',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/competitions/registrations/my', host: ['{{BASE_URL}}'], path: ['api', 'competitions', 'registrations', 'my'] }
+      }
+    },
+    {
       name: 'Admin Reject Competition Registration',
       event: [makeTest(200)],
       auth: bearerAuth('admin_token'),
@@ -743,6 +775,34 @@ const competitionsFolder = {
           raw: JSON.stringify({ rejectionReason: 'Participant grade does not meet eligibility requirements.' }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/admin/competition-registrations/{{comp_reg_id}}/reject', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'competition-registrations', '{{comp_reg_id}}', 'reject'] }
+      }
+    },
+    {
+      name: 'Admin Pass Competition Registration Round',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'PATCH',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({ roundId: '{{round_id}}' }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/admin/competition-registrations/{{comp_reg_id}}/round/pass', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'competition-registrations', '{{comp_reg_id}}', 'round', 'pass'] }
+      }
+    },
+    {
+      name: 'Admin Fail Competition Registration Round',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'PATCH',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({ roundId: '{{round_id}}' }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/admin/competition-registrations/{{comp_reg_id}}/round/fail', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'competition-registrations', '{{comp_reg_id}}', 'round', 'fail'] }
       }
     }
   ]
@@ -1173,6 +1233,7 @@ const environment = {
     { key: 'enrollment_id', value: '64a1b2c3d4e5f6789012abcf', enabled: true },
     { key: 'competition_id', value: '64a1b2c3d4e5f6789012abd0', enabled: true },
     { key: 'comp_reg_id', value: '64a1b2c3d4e5f6789012abd1', enabled: true },
+    { key: 'round_id', value: '64a1b2c3d4e5f6789012abd6', enabled: true },
     { key: 'site_id', value: '64a1b2c3d4e5f6789012abd2', enabled: true },
     { key: 'notification_id', value: '64a1b2c3d4e5f6789012abd3', enabled: true },
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', enabled: true },

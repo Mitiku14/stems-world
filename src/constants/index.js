@@ -28,9 +28,12 @@ const COURSE_CATEGORIES = ['science', 'technology', 'engineering', 'arts', 'math
 const COURSE_SUBCATEGORY_SLUG_REGEX = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 const COURSE_LEVELS     = ['beginner', 'intermediate', 'advanced', 'all'];
 
-const COMPETITION_TYPES = ['competition', 'hackathon', 'workshop', 'training', 'event'];
+const COMPETITION_CATEGORIES = ['steam_innovation', 'olympiad'];
+const COMPETITION_TYPES = ['individual', 'team'];
 const COMPETITION_SCOPES = ['local', 'national', 'international'];
-const COMPETITION_STATUSES = ['draft', 'upcoming', 'open', 'closed', 'completed', 'cancelled'];
+const COMPETITION_STATUSES = ['draft', 'published', 'completed', 'cancelled'];
+const COMPETITION_PROGRESSION_STATUSES = ['not_started', 'in_progress', 'eliminated', 'completed'];
+const COMPETITION_ROUND_STATUSES = ['pending', 'passed', 'failed'];
 
 module.exports = {
   ROLES,
@@ -41,7 +44,10 @@ module.exports = {
   COURSE_CATEGORIES,
   COURSE_SUBCATEGORY_SLUG_REGEX,
   COURSE_LEVELS,
+  COMPETITION_CATEGORIES,
   COMPETITION_TYPES,
   COMPETITION_SCOPES,
   COMPETITION_STATUSES,
+  COMPETITION_PROGRESSION_STATUSES,
+  COMPETITION_ROUND_STATUSES,
 };

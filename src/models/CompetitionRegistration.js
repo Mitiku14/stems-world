@@ -1,5 +1,33 @@
 const mongoose = require('mongoose');
-const { ENROLLMENT_STATUS } = require('../constants'); // we can reuse pending/accepted/rejected
+const {
+  ENROLLMENT_STATUS,
+  COMPETITION_PROGRESSION_STATUSES,
+  COMPETITION_ROUND_STATUSES,
+} = require('../constants');
+
+const roundProgressSchema = new mongoose.Schema(
+  {
+    round: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: COMPETITION_ROUND_STATUSES,
+      default: 'pending',
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: true }
+);
 
 const competitionRegistrationSchema = new mongoose.Schema(
   {
@@ -67,6 +95,19 @@ const competitionRegistrationSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(ENROLLMENT_STATUS),
       default: ENROLLMENT_STATUS.PENDING,
+    },
+    progressionStatus: {
+      type: String,
+      enum: COMPETITION_PROGRESSION_STATUSES,
+      default: 'not_started',
+    },
+    currentRound: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    roundProgress: {
+      type: [roundProgressSchema],
+      default: [],
     },
     rejectionReason: {
       type: String,

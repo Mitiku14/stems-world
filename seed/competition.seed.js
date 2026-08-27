@@ -1,80 +1,122 @@
 require('dotenv').config();
+
 const mongoose = require('mongoose');
 const Competition = require('../src/models/Competition');
 
-const competitions = [
+const COMPETITION_SEEDS = [
   {
     title: 'National Coding Hackathon 2026',
-    description: 'The premier national coding competition bringing together standard high school teams to solve real-world problems using technology. Show off your team\'s skills in front of top tech industry judges.',
-    type: 'hackathon',
+    description: 'A national team coding challenge focused on solving real-world problems with technology.',
+    category: 'steam_innovation',
+    type: 'team',
     scope: 'national',
     imageUrl: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&q=80',
-    registrationOpenDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // opened 7 days ago
-    registrationCloseDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // closes in 14 days
-    eventStartDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    eventEndDate: new Date(Date.now() + 32 * 24 * 60 * 60 * 1000),
+    registrationOpenDate: new Date('2026-08-01T00:00:00.000Z'),
+    registrationCloseDate: new Date('2026-10-01T00:00:00.000Z'),
+    eventStartDate: new Date('2026-10-15T00:00:00.000Z'),
+    eventEndDate: new Date('2026-10-17T00:00:00.000Z'),
     location: 'AfriSTEAM Main Campus, Addis Ababa',
-    eligibility: 'Open to all high school students (Grades 9-12)',
-    requirements: ['Laptop', 'Basic programming knowledge', 'Team of 3-5 members'],
-    maxParticipants: 50, // meaning 50 teams if registrations act like teams
-    status: 'open',
+    requirements: [
+      'Open to high school students in Grades 9-12',
+      'Laptop',
+      'Basic programming knowledge',
+      'Team of 3-5 members',
+    ],
+    maxRegistrations: 50,
+    status: 'published',
     organizer: 'AfriSTEAM Foundation',
-    contactEmail: 'hackathons@afristeam.com'
+    contactEmail: 'hackathons@afristeam.com',
   },
   {
     title: 'Robotics Challenge - Regional Qualifier',
-    description: 'Design, build, and program a robot to navigate through an obstacle course. Winners proceed to the National Finals.',
-    type: 'competition',
+    description: 'An individual robotics challenge to design and program a robot for an obstacle course.',
+    category: 'steam_innovation',
+    type: 'individual',
     scope: 'local',
     imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80',
-    registrationOpenDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // opens next week
-    registrationCloseDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
-    eventStartDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-    eventEndDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+    registrationOpenDate: new Date('2026-09-01T00:00:00.000Z'),
+    registrationCloseDate: new Date('2026-09-21T00:00:00.000Z'),
+    eventStartDate: new Date('2026-10-15T00:00:00.000Z'),
+    eventEndDate: new Date('2026-10-15T00:00:00.000Z'),
     location: 'Bole Youth Center',
-    eligibility: 'Middle school students (Grades 6-8)',
-    requirements: ['School ID', 'Robotics Kit (Provided)'],
-    maxParticipants: 30,
-    status: 'upcoming',
+    requirements: [
+      'Middle school students in Grades 6-8',
+      'School ID',
+      'Robotics kit provided',
+    ],
+    maxRegistrations: 30,
+    status: 'published',
     organizer: 'AfriSTEAM Robotics Division',
-    contactEmail: 'robotics@afristeam.com'
+    contactEmail: 'robotics@afristeam.com',
   },
   {
     title: 'AI Innovation Workshop',
-    description: 'An intensive weekend workshop for students passionate about Artificial Intelligence and prompt engineering.',
-    type: 'workshop',
+    description: 'An individual artificial-intelligence innovation challenge for students.',
+    category: 'steam_innovation',
+    type: 'individual',
     scope: 'local',
     imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80',
-    registrationOpenDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 
-    registrationCloseDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // recently closed
-    eventStartDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // started 2 days ago
-    eventEndDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // ended yesterday
-    location: 'Virtual (Zoom)',
-    eligibility: 'All students',
-    requirements: ['Internet Connection', 'Computer'],
-    maxParticipants: 100,
+    registrationOpenDate: new Date('2026-05-01T00:00:00.000Z'),
+    registrationCloseDate: new Date('2026-06-01T00:00:00.000Z'),
+    eventStartDate: new Date('2026-06-06T00:00:00.000Z'),
+    eventEndDate: new Date('2026-06-07T00:00:00.000Z'),
+    location: 'Virtual',
+    requirements: ['Open to all students', 'Internet connection', 'Computer'],
+    maxRegistrations: 100,
     status: 'completed',
     organizer: 'AfriSTEAM Tech Labs',
-    contactEmail: 'hello@afristeam.com'
-  }
+    contactEmail: 'hello@afristeam.com',
+  },
 ];
 
-const seedCompetitions = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/afristeam');
-    console.log('✅ MongoDB connected');
+const ensureSeedCompetitions = async (Model = Competition) => {
+  if (typeof Model.init === 'function') await Model.init();
+  const timestamp = new Date();
 
-    await Competition.deleteMany({});
-    console.log('🧹 Existing competitions cleared');
+  const result = await Model.bulkWrite(
+    COMPETITION_SEEDS.map((competition) => ({
+      updateOne: {
+        filter: { title: competition.title },
+        update: {
+          $setOnInsert: {
+            ...competition,
+            isActive: true,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        },
+        upsert: true,
+        timestamps: false,
+      },
+    })),
+    { ordered: false }
+  );
 
-    await Competition.insertMany(competitions);
-    console.log(`✅ Successfully seeded ${competitions.length} competitions`);
-
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error seeding competitions:', error);
-    process.exit(1);
-  }
+  return {
+    expectedCount: COMPETITION_SEEDS.length,
+    matchedCount: result.matchedCount || 0,
+    modifiedCount: result.modifiedCount || 0,
+    upsertedCount: result.upsertedCount || 0,
+  };
 };
 
-seedCompetitions();
+const seedCompetitions = async () => {
+  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/afristeam');
+  console.log('MongoDB connected');
+
+  const result = await ensureSeedCompetitions();
+  console.log(JSON.stringify({ message: 'Competition seed complete', ...result }, null, 2));
+};
+
+if (require.main === module) {
+  seedCompetitions()
+    .catch((error) => {
+      console.error(`Competition seed failed: ${error.message}`);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await mongoose.disconnect();
+    });
+}
+
+module.exports = { COMPETITION_SEEDS, ensureSeedCompetitions, seedCompetitions };
