@@ -428,6 +428,13 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             studentName: { type: 'string', example: 'Jane Doe' },
             email: { type: 'string', example: 'jane@example.com' },
             phone: { type: 'string', example: '+1234567890' },
+            academicFile: {
+              type: 'string',
+              format: 'uri',
+              nullable: true,
+              description: 'Optional URL of the academic/supporting document submitted with the Competition registration.',
+              example: 'https://example.com/documents/academic-record.pdf',
+            },
             grade: { type: 'string', example: '11th Grade' },
             school: { type: 'string', example: 'Central High School' },
             skills: { type: 'array', items: { type: 'string' } },

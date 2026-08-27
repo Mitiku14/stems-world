@@ -59,6 +59,11 @@ const competitionRegistrationSchema = new mongoose.Schema(
       default: null,
       maxlength: [20, 'Phone cannot exceed 20 characters'],
     },
+    academicFile: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     grade: {
       type: String,
       trim: true,

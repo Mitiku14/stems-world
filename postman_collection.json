@@ -1962,7 +1962,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Postman Participant\",\n  \"email\": \"postman_participant@example.com\",\n  \"phone\": \"+1234567890\",\n  \"grade\": \"11th Grade\",\n  \"school\": \"Central High School\",\n  \"skills\": [\n    \"Python\",\n    \"Robotics\"\n  ],\n  \"motivation\": \"I love coding and artificial intelligence!\",\n  \"teamName\": \"Code Warriors\",\n  \"teamMembers\": [\n    \"Alice\",\n    \"Bob\"\n  ]\n}"
+              "raw": "{\n  \"fullName\": \"Postman Participant\",\n  \"email\": \"postman_participant@example.com\",\n  \"phone\": \"+1234567890\",\n  \"academicFile\": \"https://example.com/documents/academic-record.pdf\",\n  \"grade\": \"11th Grade\",\n  \"school\": \"Central High School\",\n  \"skills\": [\n    \"Python\",\n    \"Robotics\"\n  ],\n  \"motivation\": \"I love coding and artificial intelligence!\",\n  \"teamName\": \"Code Warriors\",\n  \"teamMembers\": [\n    \"Alice\",\n    \"Bob\"\n  ]\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/competitions/{{competition_id}}/register",

@@ -13,6 +13,7 @@ const competitionValidator = require('../src/validators/competition.validator');
 const compRegValidator = require('../src/validators/competitionRegistration.validator');
 const compCtrl = require('../src/controllers/competition.controller');
 const compRegCtrl = require('../src/controllers/competitionRegistration.controller');
+const exportController = require('../src/controllers/export.controller');
 const User = require('../src/models/User');
 const emailService = require('../src/services/email.service');
 const notificationService = require('../src/services/notification.service');
@@ -1806,6 +1807,255 @@ test('Competition frontend Swagger and Postman contracts expose round definition
     assert.deepEqual(JSON.parse(request.request.body.raw), { roundId: '{{round_id}}' });
     assert.match(request.request.description, /currentRound.*roundId.*round order/);
   }
+});
+
+test('CompetitionRegistration academicFile is an optional, trimmed single URL field owned only by registrations', async () => {
+  const academicFilePath = CompetitionRegistration.schema.path('academicFile');
+  assert.equal(academicFilePath.instance, 'String');
+  assert.notEqual(academicFilePath.isRequired, true);
+  assert.equal(academicFilePath.defaultValue, null);
+  assert.equal(academicFilePath.options.trim, true);
+  assert.equal(Competition.schema.path('academicFile'), undefined);
+  assert.equal(User.schema.path('academicFile'), undefined);
+
+  const withoutFile = new CompetitionRegistration({
+    competition: new mongoose.Types.ObjectId(),
+    fullName: 'No File Applicant',
+    email: 'no-file@example.com',
+  });
+  assert.equal(withoutFile.validateSync(), undefined);
+  assert.equal(withoutFile.academicFile, null);
+
+  const withFile = new CompetitionRegistration({
+    competition: new mongoose.Types.ObjectId(),
+    fullName: 'File Applicant',
+    email: 'file@example.com',
+    academicFile: '  https://storage.example.com/competition-documents/student-123.pdf  ',
+  });
+  assert.equal(withFile.validateSync(), undefined);
+  assert.equal(withFile.academicFile, 'https://storage.example.com/competition-documents/student-123.pdf');
+
+  const baseRequest = {
+    params: { id: new mongoose.Types.ObjectId().toString() },
+    body: { fullName: 'Validated Applicant', email: 'validated@example.com' },
+  };
+  assert.equal((await validate(compRegValidator.submitRegistrationRules, baseRequest)).isEmpty(), true);
+  assert.equal((await validate(compRegValidator.submitRegistrationRules, {
+    ...baseRequest,
+    body: { ...baseRequest.body, academicFile: null },
+  })).isEmpty(), true);
+  assert.equal((await validate(compRegValidator.submitRegistrationRules, {
+    ...baseRequest,
+    body: { ...baseRequest.body, academicFile: '' },
+  })).isEmpty(), true);
+  assert.equal((await validate(compRegValidator.submitRegistrationRules, {
+    ...baseRequest,
+    body: { ...baseRequest.body, academicFile: 'https://example.com/documents/academic-record.pdf' },
+  })).isEmpty(), true);
+
+  for (const invalidValue of ['not-a-url', { url: 'https://example.com/not-a-string.pdf' }]) {
+    const malformed = await validate(compRegValidator.submitRegistrationRules, {
+      ...baseRequest,
+      body: { ...baseRequest.body, academicFile: invalidValue },
+    });
+    assert.equal(malformed.isEmpty(), false);
+    assert.equal(malformed.array().some(({ path: field }) => field === 'academicFile'), true);
+  }
+});
+
+test('submitRegistration stores academicFile for authenticated individual and anonymous team registrations', async () => {
+  const competitionId = new mongoose.Types.ObjectId();
+  const academicFile = 'https://example.com/documents/academic-record.pdf';
+  let competitionType = 'individual';
+  const captured = [];
+  const originals = {
+    transaction: mongoose.connection.transaction,
+    competitionFindOne: Competition.findOne,
+    competitionFindOneAndUpdate: Competition.findOneAndUpdate,
+    registrationFindOne: CompetitionRegistration.findOne,
+    registrationCount: CompetitionRegistration.countDocuments,
+    registrationCreate: CompetitionRegistration.create,
+    userExists: User.exists,
+    email: emailService.sendCompetitionRegistrationSubmittedEmail,
+    createNotification: notificationService.createNotification,
+    notifyByEmail: notificationService.notifyUserByEmail,
+  };
+  const currentCompetition = () => ({
+    _id: competitionId,
+    title: 'Academic File Competition',
+    type: competitionType,
+    status: 'published',
+    isActive: true,
+  });
+
+  mongoose.connection.transaction = async (callback) => callback({ isolated: true });
+  Competition.findOne = async () => currentCompetition();
+  Competition.findOneAndUpdate = async () => currentCompetition();
+  CompetitionRegistration.findOne = () => ({ session: async () => null });
+  CompetitionRegistration.countDocuments = () => ({ session: async () => 0 });
+  CompetitionRegistration.create = async ([payload]) => {
+    captured.push(payload);
+    return [{ _id: new mongoose.Types.ObjectId(), createdAt: new Date(), ...payload }];
+  };
+  User.exists = async () => false;
+  emailService.sendCompetitionRegistrationSubmittedEmail = () => {};
+  notificationService.createNotification = () => {};
+  notificationService.notifyUserByEmail = () => {};
+
+  const invokeRegistration = (body, user) => invokeHandler(compRegCtrl.submitRegistration, {
+    params: { id: competitionId.toString() },
+    body,
+    ...(user && { user }),
+  });
+
+  try {
+    const authenticated = await invokeRegistration(
+      { fullName: 'Ignored Name', email: 'ignored@example.com', academicFile },
+      { _id: new mongoose.Types.ObjectId(), name: 'Authenticated Applicant', email: 'auth@example.com' }
+    );
+    assert.equal(authenticated.status, 201);
+    assert.equal(captured[0].academicFile, academicFile);
+    assert.equal(authenticated.body.data.academicFile, academicFile);
+    assert.ok(captured[0].student);
+
+    competitionType = 'team';
+    const anonymous = await invokeRegistration({
+      fullName: 'Anonymous Team Applicant',
+      email: 'anonymous-team@example.com',
+      academicFile,
+      teamName: 'Document Team',
+      teamMembers: ['Member One'],
+    });
+    assert.equal(anonymous.status, 201);
+    assert.equal(captured[1].academicFile, academicFile);
+    assert.equal(anonymous.body.data.academicFile, academicFile);
+    assert.equal(captured[1].student, null);
+    assert.equal(captured[1].teamName, 'Document Team');
+  } finally {
+    mongoose.connection.transaction = originals.transaction;
+    Competition.findOne = originals.competitionFindOne;
+    Competition.findOneAndUpdate = originals.competitionFindOneAndUpdate;
+    CompetitionRegistration.findOne = originals.registrationFindOne;
+    CompetitionRegistration.countDocuments = originals.registrationCount;
+    CompetitionRegistration.create = originals.registrationCreate;
+    User.exists = originals.userExists;
+    emailService.sendCompetitionRegistrationSubmittedEmail = originals.email;
+    notificationService.createNotification = originals.createNotification;
+    notificationService.notifyUserByEmail = originals.notifyByEmail;
+  }
+});
+
+test('authorized full registration responses and CSV export expose academicFile', async () => {
+  const academicFile = 'https://example.com/documents/academic-record.pdf';
+  const userId = new mongoose.Types.ObjectId();
+  const record = {
+    _id: new mongoose.Types.ObjectId(),
+    competition: {
+      _id: new mongoose.Types.ObjectId(),
+      title: 'Document Review Competition',
+      rounds: [],
+    },
+    student: { _id: userId, name: 'Document Applicant', email: 'document@example.com' },
+    fullName: 'Document Applicant',
+    email: 'document@example.com',
+    phone: null,
+    academicFile,
+    skills: [],
+    teamMembers: [],
+    status: 'pending',
+    progressionStatus: 'not_started',
+    roundProgress: [],
+    createdAt: new Date('2026-08-27T00:00:00.000Z'),
+  };
+  const originals = {
+    find: CompetitionRegistration.find,
+    countDocuments: CompetitionRegistration.countDocuments,
+  };
+  const query = {
+    populate() { return query; },
+    sort() { return query; },
+    skip() { return query; },
+    limit() { return query; },
+    lean: async () => [record],
+  };
+  CompetitionRegistration.find = () => query;
+  CompetitionRegistration.countDocuments = async () => 1;
+
+  try {
+    const admin = await invokeHandler(compRegCtrl.getAllRegistrations, {
+      query: { page: '1', limit: '10' },
+    });
+    assert.equal(admin.status, 200);
+    assert.equal(admin.body.data.registrations[0].academicFile, academicFile);
+
+    const student = await invokeHandler(compRegCtrl.getMyRegistrations, {
+      user: { _id: userId, email: 'document@example.com' },
+    });
+    assert.equal(student.status, 200);
+    assert.equal(student.body.data.registrations[0].academicFile, academicFile);
+
+    let csv;
+    let exportError;
+    const exportResponse = {
+      setHeader() {},
+      status() { return exportResponse; },
+      send(value) { csv = value; return value; },
+    };
+    await exportController.exportCompetitionRegistrations(
+      { query: {} },
+      exportResponse,
+      (error) => { exportError = error; }
+    );
+    assert.equal(exportError, undefined);
+    assert.match(csv, /"Academic File"/);
+    assert.ok(csv.includes(`"${academicFile}"`));
+  } finally {
+    CompetitionRegistration.find = originals.find;
+    CompetitionRegistration.countDocuments = originals.countDocuments;
+  }
+});
+
+test('Swagger and canonical Postman artifacts document optional CompetitionRegistration academicFile', () => {
+  const schema = swaggerSpec.components.schemas.CompetitionRegistration;
+  assert.deepEqual(schema.properties.academicFile, {
+    type: 'string',
+    format: 'uri',
+    nullable: true,
+    description: 'Optional URL of the academic/supporting document submitted with the Competition registration.',
+    example: 'https://example.com/documents/academic-record.pdf',
+  });
+  assert.equal((schema.required || []).includes('academicFile'), false);
+
+  const registrationOperation = swaggerSpec.paths['/api/competitions/{id}/register'].post;
+  const requestSchema = registrationOperation.requestBody.content['application/json'].schema;
+  assert.equal(requestSchema.properties.academicFile.format, 'uri');
+  assert.equal(requestSchema.required.includes('academicFile'), false);
+  assert.equal(
+    swaggerSpec.paths['/api/admin/competition-registrations'].get.responses['200']
+      .content['application/json'].schema.properties.data.properties.registrations.items.$ref,
+    '#/components/schemas/CompetitionRegistration'
+  );
+  assert.equal(
+    swaggerSpec.paths['/api/competitions/registrations/my'].get.responses['200']
+      .content['application/json'].schema.properties.data.properties.registrations.items.$ref,
+    '#/components/schemas/CompetitionRegistration'
+  );
+
+  const generatorSource = fs.readFileSync(path.join(__dirname, '../scripts/generate-postman.js'), 'utf8');
+  assert.match(generatorSource, /academicFile: 'https:\/\/example\.com\/documents\/academic-record\.pdf'/);
+
+  const collection = JSON.parse(fs.readFileSync(path.join(__dirname, '../postman_collection.json'), 'utf8'));
+  const requests = [];
+  const collect = (items = []) => items.forEach((item) => {
+    if (item.request) requests.push(item);
+    collect(item.item);
+  });
+  collect(collection.item);
+  const registrationRequest = requests.find(({ name }) => name === 'Register for Competition');
+  assert.equal(
+    JSON.parse(registrationRequest.request.body.raw).academicFile,
+    'https://example.com/documents/academic-record.pdf'
+  );
 });
 
 async function validationStatus(chains, req) {

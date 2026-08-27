@@ -635,6 +635,7 @@ const competitionsFolder = {
             fullName: 'Postman Participant',
             email: 'postman_participant@example.com',
             phone: '+1234567890',
+            academicFile: 'https://example.com/documents/academic-record.pdf',
             grade: '11th Grade',
             school: 'Central High School',
             skills: ['Python', 'Robotics'],

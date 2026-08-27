@@ -65,6 +65,7 @@ const flattenRegistration = (r) => ({
   studentName: r.student?.name || r.fullName || '—',
   email: r.student?.email || r.email || '—',
   phone: r.phone,
+  academicFile: r.academicFile || null,
   grade: r.grade,
   school: r.school,
   skills: r.skills,
@@ -84,7 +85,7 @@ const flattenRegistration = (r) => ({
 
 exports.submitRegistration = asyncHandler(async (req, res) => {
   const compId = req.params.id;
-  const { fullName, email, phone, grade, school, skills, motivation, teamName, teamMembers } = req.body;
+  const { fullName, email, phone, academicFile, grade, school, skills, motivation, teamName, teamMembers } = req.body;
 
   const competition = await Competition.findOne({ _id: compId, isActive: true });
   if (!competition) throw new ApiError(404, 'Competition not found or no longer available.');
@@ -150,6 +151,7 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
         fullName: regName,
         email: regEmail,
         phone: phone || null,
+        academicFile: academicFile || null,
         grade: grade || null,
         school: school || null,
         skills: skills || [],
@@ -196,6 +198,7 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
   return res.status(201).json(
     new ApiResponse(201, 'Registration submitted successfully.', {
       id: registration._id,
+      academicFile: registration.academicFile || null,
       status: registration.status,
       progressionStatus: registration.progressionStatus,
     })

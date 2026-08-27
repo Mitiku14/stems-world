@@ -119,6 +119,11 @@ const optionalAuth = (req, res, next) => {
  *               fullName: { type: string }
  *               email: { type: string }
  *               phone: { type: string }
+ *               academicFile:
+ *                 type: string
+ *                 format: uri
+ *                 nullable: true
+ *                 description: Optional URL of the academic/supporting document submitted with the Competition registration.
  *               grade: { type: string }
  *               school: { type: string }
  *               skills: { type: array, items: { type: string } }

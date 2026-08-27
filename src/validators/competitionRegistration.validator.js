@@ -17,6 +17,11 @@ const submitRegistrationRules = [
     .normalizeEmail(),
 
   body('phone').optional({ nullable: true }).trim().isLength({ max: 20 }),
+  body('academicFile')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('Academic file must be a valid HTTP/HTTPS URL'),
   body('grade').optional({ nullable: true }).trim().isLength({ max: 50 }),
   body('school').optional({ nullable: true }).trim().isLength({ max: 150 }),
   
