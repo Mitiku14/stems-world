@@ -11,17 +11,30 @@ const ENROLLMENT_STATUS = {
 
 const TOKEN_TYPES = {
   EMAIL_VERIFICATION: 'emailVerification',
+  PHONE_VERIFICATION: 'phoneVerification',
   PASSWORD_RESET:     'passwordReset',
 };
 
 const TOKEN_EXPIRY = {
   EMAIL_VERIFICATION: 24 * 60 * 60 * 1000, // 24 hours
+  PHONE_VERIFICATION: 5 * 60 * 1000,       // 5 minutes (future OTP flow)
   PASSWORD_RESET:     30 * 60 * 1000,       // 30 minutes
 };
+
+const PHONE_OTP = Object.freeze({
+  DIGITS: 6,
+  MAX_ATTEMPTS: 5,
+  RESEND_COOLDOWN_MS: 60 * 1000,
+});
 
 const AUTH_PROVIDERS = {
   LOCAL:  'local',
   GOOGLE: 'google',
+};
+
+const COMMUNICATION_CHANNELS = {
+  EMAIL: 'email',
+  PHONE: 'phone',
 };
 
 const COURSE_CATEGORIES = ['science', 'technology', 'engineering', 'arts', 'mathematics'];
@@ -40,7 +53,9 @@ module.exports = {
   ENROLLMENT_STATUS,
   TOKEN_TYPES,
   TOKEN_EXPIRY,
+  PHONE_OTP,
   AUTH_PROVIDERS,
+  COMMUNICATION_CHANNELS,
   COURSE_CATEGORIES,
   COURSE_SUBCATEGORY_SLUG_REGEX,
   COURSE_LEVELS,

@@ -25,7 +25,8 @@ const collection = {
     { key: 'notification_id', value: '64a1b2c3d4e5f6789012abd3', type: 'string' },
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', type: 'string' },
     { key: 'certificate_number', value: 'CERT-2026-A1B2C3D4', type: 'string' },
-    { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', type: 'string' }
+    { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', type: 'string' },
+    { key: 'phone_otp', value: '123456', type: 'string' }
   ],
   item: []
 };
@@ -193,7 +194,11 @@ const authFolder = {
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
           mode: 'raw',
-          raw: JSON.stringify({ name: 'Postman Student Updated' }, null, 2)
+          raw: JSON.stringify({
+            name: 'Postman Student Updated',
+            phone: '0912345678',
+            preferredCommunication: 'email'
+          }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/auth/me', host: ['{{BASE_URL}}'], path: ['api', 'auth', 'me'] }
       }
@@ -209,6 +214,29 @@ const authFolder = {
           raw: JSON.stringify({ idToken: 'sample_google_id_token_jwt' }, null, 2)
         },
         url: { raw: '{{BASE_URL}}/api/auth/google', host: ['{{BASE_URL}}'], path: ['api', 'auth', 'google'] }
+      }
+    },
+    {
+      name: 'Resend Phone Verification',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'POST',
+        url: { raw: '{{BASE_URL}}/api/auth/resend-phone-verification', host: ['{{BASE_URL}}'], path: ['api', 'auth', 'resend-phone-verification'] }
+      }
+    },
+    {
+      name: 'Verify Phone',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'POST',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({ code: '{{phone_otp}}' }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/auth/verify-phone', host: ['{{BASE_URL}}'], path: ['api', 'auth', 'verify-phone'] }
       }
     }
   ]
@@ -1242,7 +1270,8 @@ const environment = {
     { key: 'notification_id', value: '64a1b2c3d4e5f6789012abd3', enabled: true },
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', enabled: true },
     { key: 'certificate_number', value: 'CERT-2026-A1B2C3D4', enabled: true },
-    { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', enabled: true }
+    { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', enabled: true },
+    { key: 'phone_otp', value: '123456', enabled: true }
   ]
 };
 

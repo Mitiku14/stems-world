@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { ROLES, AUTH_PROVIDERS } = require('../constants');
+const { ROLES, AUTH_PROVIDERS, COMMUNICATION_CHANNELS } = require('../constants');
+const normalizePhone = require('../utils/normalizePhone');
 
 const userSchema = new mongoose.Schema(
   {
@@ -70,6 +71,17 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    isPhoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    preferredCommunication: {
+      type: String,
+      enum: Object.values(COMMUNICATION_CHANNELS),
+      default: COMMUNICATION_CHANNELS.EMAIL,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -77,5 +89,38 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Only changed phone values are normalized. Legacy stored values remain untouched
+// until the explicit contact-index migration is reviewed and run.
+userSchema.pre('validate', function normalizeChangedPhone() {
+  if (!this.isModified('phone')) return;
+
+  if (this.phone === null || this.phone === undefined || this.phone === '') {
+    this.phone = null;
+    this.isPhoneVerified = false;
+    this.markModified('isPhoneVerified');
+    return;
+  }
+
+  try {
+    this.phone = normalizePhone(this.phone);
+    this.isPhoneVerified = false;
+    this.markModified('isPhoneVerified');
+  } catch (error) {
+    this.invalidate('phone', error.message);
+  }
+});
+
+userSchema.pre('validate', function validatePreferredCommunication() {
+  if (
+    this.preferredCommunication === COMMUNICATION_CHANNELS.PHONE
+    && (!this.phone || !this.isPhoneVerified)
+  ) {
+    this.invalidate(
+      'preferredCommunication',
+      'Phone communication requires a verified phone number'
+    );
+  }
+});
 
 module.exports = mongoose.model('User', userSchema);

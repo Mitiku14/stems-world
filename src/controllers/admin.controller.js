@@ -6,7 +6,7 @@ const CompetitionRegistration = require('../models/CompetitionRegistration');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError   = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
-const { ROLES, ENROLLMENT_STATUS } = require('../constants');
+const { ROLES, ENROLLMENT_STATUS, COMMUNICATION_CHANNELS } = require('../constants');
 const emailService = require('../services/email.service');
 const notificationService = require('../services/notification.service');
 const escapeRegex = require('../utils/escapeRegex');
@@ -16,6 +16,13 @@ const paginate = (total, page, limit) => ({
   page,
   limit,
   totalPages: Math.ceil(total / limit),
+});
+
+const withContactDefaults = (user) => ({
+  ...user,
+  phone: user.phone || null,
+  isPhoneVerified: user.isPhoneVerified === true,
+  preferredCommunication: user.preferredCommunication || COMMUNICATION_CHANNELS.EMAIL,
 });
 
 /**
@@ -313,7 +320,7 @@ exports.getAllStudents = asyncHandler(async (req, res) => {
 
   const [students, total] = await Promise.all([
     User.find(filter)
-      .select('username name email phone isEmailVerified isActive createdAt')
+      .select('username name email phone isEmailVerified isPhoneVerified preferredCommunication isActive createdAt')
       .sort({ createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)
@@ -322,7 +329,7 @@ exports.getAllStudents = asyncHandler(async (req, res) => {
   ]);
 
   return res.json(new ApiResponse(200, 'Students fetched successfully.', {
-    students,
+    students: students.map(withContactDefaults),
     pagination: paginate(total, p, l),
   }));
 });
@@ -339,7 +346,10 @@ exports.getStudentById = asyncHandler(async (req, res) => {
 
   if (!student) throw new ApiError(404, 'Student not found.');
 
-  return res.json(new ApiResponse(200, 'Student fetched successfully.', { ...student, enrollments }));
+  return res.json(new ApiResponse(200, 'Student fetched successfully.', {
+    ...withContactDefaults(student),
+    enrollments,
+  }));
 });
 
 exports.toggleStudentStatus = asyncHandler(async (req, res) => {

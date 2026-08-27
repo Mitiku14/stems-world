@@ -1,3 +1,5 @@
+const smsEnabled = /^(true|1)$/i.test(process.env.SMS_ENABLED || 'false');
+
 const required = [
   'MONGODB_URI',
   'JWT_SECRET',
@@ -10,6 +12,13 @@ const required = [
   'CLIENT_URL',
   'GOOGLE_CLIENT_ID',
 ];
+
+if (smsEnabled) {
+  required.push(
+    'OTP_SECRET',
+    'SMS_PROVIDER'
+  );
+}
 
 const missing = required.filter((key) => !process.env[key]);
 
@@ -41,5 +50,19 @@ module.exports = {
   google: {
     clientId:     process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  },
+
+  otp: {
+    secret: process.env.OTP_SECRET || '',
+  },
+
+  sms: {
+    enabled: smsEnabled,
+    provider: process.env.SMS_PROVIDER || '',
+    apiBaseUrl: process.env.SMS_API_BASE_URL || '',
+    apiKey: process.env.SMS_API_KEY || '',
+    username: process.env.SMS_USERNAME || '',
+    senderId: process.env.SMS_SENDER_ID || '',
+    timeoutMs: parseInt(process.env.SMS_TIMEOUT_MS, 10) || 5000,
   },
 };

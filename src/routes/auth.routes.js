@@ -94,6 +94,92 @@ router.post('/resend-verification', authValidator.forgotPassword, validate, auth
 
 /**
  * @swagger
+ * /api/auth/resend-phone-verification:
+ *   post:
+ *     summary: Request/resend phone verification OTP
+ *     description: >
+ *       Generates a secure 6-digit OTP code and dispatches it via SMS transport to the currently
+ *       authenticated user's stored canonical phone number (`User.phone`).
+ *       Requires an authenticated user context (`BearerAuth`).
+ *       Enforces a **60-second resend cooldown**.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Verification code sent or phone number already verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Verification code sent.' }
+ *       400:
+ *         description: User has no phone number on profile
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       429:
+ *         description: Resend cooldown active — please wait before requesting another code
+ *       503:
+ *         description: SMS delivery or OTP configuration unavailable
+ */
+router.post('/resend-phone-verification', verifyToken, authController.resendPhoneVerification);
+
+/**
+ * @swagger
+ * /api/auth/verify-phone:
+ *   post:
+ *     summary: Verify phone OTP
+ *     description: >
+ *       Verifies the 6-digit OTP sent to the user's phone.
+ *       On successful verification, sets `isPhoneVerified = true`.
+ *       Enforces a **5-minute expiry window** and **maximum 5 failed attempts**.
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code]
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 pattern: '^\d{6}$'
+ *                 example: '123456'
+ *                 description: 6-digit numeric OTP verification code
+ *     responses:
+ *       200:
+ *         description: Phone number verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Phone number verified successfully.' }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     phone: { type: string, example: '+251912345678' }
+ *                     isPhoneVerified: { type: boolean, example: true }
+ *                     preferredCommunication: { type: string, example: 'email' }
+ *       400:
+ *         description: Code invalid, expired, attempt limit reached, or no phone number on profile
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ *       503:
+ *         description: Phone verification functionality disabled
+ */
+router.post('/verify-phone', verifyToken, authValidator.verifyPhone, validate, authController.verifyPhone);
+
+/**
+ * @swagger
  * /api/auth/login:
  *   post:
  *     summary: Log in with email and password
@@ -326,11 +412,13 @@ router.post('/reset-password/:token', authValidator.resetPassword, validate, aut
  *                     username: { type: string, example: 'john_doe' }
  *                     name: { type: string, example: 'John Doe' }
  *                     email: { type: string, example: 'john@example.com' }
- *                     phone: { type: string, nullable: true, example: '+1234567890' }
+ *                     phone: { type: string, nullable: true, pattern: '^\+[1-9]\d{7,14}$', example: '+251912345678' }
  *                     role: { type: string, example: 'student' }
  *                     avatar: { type: string, nullable: true }
  *                     authProvider: { type: string, example: 'local' }
  *                     isEmailVerified: { type: boolean, example: true }
+ *                     isPhoneVerified: { type: boolean, example: false }
+ *                     preferredCommunication: { type: string, enum: [email, phone], example: email }
  *                     createdAt: { type: string, format: date-time }
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
@@ -343,7 +431,10 @@ router.get('/me', verifyToken, authController.getMe);
  *   put:
  *     summary: Update current user profile
  *     description: >
- *       Updates the authenticated user's `name` and/or `phone`.
+ *       Updates the authenticated user's `name`, `phone`, and/or `preferredCommunication`.
+ *       Ethiopian local phone numbers are normalized to E.164. Changing or removing a phone
+ *       resets phone verification. Phone cannot be preferred until it is verified. If a
+ *       phone-preferred user changes/removes the phone, preference falls back to verified email.
  *       Email, password, and role cannot be changed via this endpoint.
  *       Works for both local and Google accounts.
  *     tags: [Auth]
@@ -362,7 +453,15 @@ router.get('/me', verifyToken, authController.getMe);
  *                 example: John Updated Doe
  *               phone:
  *                 type: string
- *                 example: '+9876543210'
+ *                 nullable: true
+ *                 pattern: '^\+[1-9]\d{7,14}$'
+ *                 example: '0912345678'
+ *                 description: Ethiopian local or international number; null or empty clears it.
+ *               preferredCommunication:
+ *                 type: string
+ *                 enum: [email, phone]
+ *                 example: email
+ *                 description: Phone requires an existing verified phone number.
  *     responses:
  *       200:
  *         description: Profile updated successfully

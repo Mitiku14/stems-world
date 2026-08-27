@@ -7,9 +7,11 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError     = require('../utils/ApiError');
 const ApiResponse  = require('../utils/ApiResponse');
 const env          = require('../config/env');
-const { TOKEN_TYPES, AUTH_PROVIDERS } = require('../constants');
+const { TOKEN_TYPES, AUTH_PROVIDERS, COMMUNICATION_CHANNELS } = require('../constants');
+const normalizePhone = require('../utils/normalizePhone');
 const tokenService = require('../services/token.service');
 const emailService = require('../services/email.service');
+const smsService = require('../services/sms.service');
 
 const googleClient = new OAuth2Client(env.google.clientId);
 
@@ -23,10 +25,36 @@ const formatUser = (user) => ({
   username:     user.username,
   name:         user.name,
   email:        user.email,
+  phone:        user.phone || null,
   role:         user.role,
   avatar:       user.avatar,
   authProvider: user.authProvider,
+  isEmailVerified: user.isEmailVerified === true,
+  isPhoneVerified: user.isPhoneVerified === true,
+  preferredCommunication: user.preferredCommunication || COMMUNICATION_CHANNELS.EMAIL,
+  createdAt:    user.createdAt,
 });
+
+const formatContactState = (user) => ({
+  phone: user.phone || null,
+  isPhoneVerified: user.isPhoneVerified === true,
+  preferredCommunication: user.preferredCommunication || COMMUNICATION_CHANNELS.EMAIL,
+});
+
+const getCanonicalPhoneForVerification = (user) => {
+  if (!user.phone) throw new ApiError(400, 'Add a phone number to your profile before requesting verification.');
+
+  let normalized;
+  try {
+    normalized = normalizePhone(user.phone);
+  } catch {
+    throw new ApiError(400, 'Update your profile with a valid phone number before requesting verification.');
+  }
+  if (normalized !== user.phone) {
+    throw new ApiError(400, 'Update your profile phone number before requesting verification.');
+  }
+  return normalized;
+};
 
 // Generates a unique username from a display name (used for local + Google signups)
 const generateUsername = async (displayName) => {
@@ -131,6 +159,89 @@ exports.resendVerification = asyncHandler(async (req, res) => {
   );
 
   return res.json(new ApiResponse(200, genericMsg));
+});
+
+/**
+ * POST /api/auth/resend-phone-verification
+ */
+exports.resendPhoneVerification = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, 'User not found.');
+
+  const targetPhone = getCanonicalPhoneForVerification(user);
+  if (user.isPhoneVerified) {
+    return res.json(new ApiResponse(200, 'Phone number is already verified.', formatContactState(user)));
+  }
+  if (!tokenService.isPhoneOtpConfigured() || !smsService.isEnabled()) {
+    throw new ApiError(503, 'Phone verification delivery is not configured.');
+  }
+
+  const issuance = await tokenService.createPhoneVerificationOtp(user._id, targetPhone);
+  if (issuance.status === 'cooldown') {
+    throw new ApiError(429, 'Please wait before requesting another verification code.');
+  }
+
+  const stillCurrent = await User.exists({
+    _id: user._id,
+    phone: targetPhone,
+    isPhoneVerified: { $ne: true },
+  });
+  if (!stillCurrent) {
+    await tokenService.discardPhoneVerificationOtp(issuance.cleanupKey);
+    throw new ApiError(409, 'Phone number changed before verification delivery. Request a new code.');
+  }
+
+  let delivery;
+  try {
+    delivery = await smsService.send({
+      to: targetPhone,
+      message: smsService.buildPhoneVerificationMessage(issuance.code),
+    });
+  } catch {
+    // Delivery may have succeeded despite a transport timeout. Keep the token
+    // and its cooldown rather than risk sending multiple valid messages.
+    throw new ApiError(503, 'Phone verification delivery status is unavailable. Please wait before retrying.');
+  }
+
+  if (delivery?.accepted !== true) {
+    if (delivery?.ambiguous !== true) {
+      await tokenService.discardPhoneVerificationOtp(issuance.cleanupKey);
+    }
+    throw new ApiError(503, 'Phone verification delivery is unavailable. Please try again later.');
+  }
+
+  return res.json(new ApiResponse(200, 'Verification code sent.'));
+});
+
+/**
+ * POST /api/auth/verify-phone
+ */
+exports.verifyPhone = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, 'User not found.');
+
+  const targetPhone = getCanonicalPhoneForVerification(user);
+  if (user.isPhoneVerified) {
+    return res.json(new ApiResponse(200, 'Phone number is already verified.', formatContactState(user)));
+  }
+  if (!tokenService.isPhoneOtpConfigured()) {
+    throw new ApiError(503, 'Phone verification is not configured.');
+  }
+
+  const result = await tokenService.verifyPhoneVerificationOtp({
+    userId: user._id,
+    targetPhone,
+    code: req.body.code,
+  });
+  if (result.status !== 'verified') {
+    throw new ApiError(400, 'Verification code is invalid or expired. Request a new code.');
+  }
+
+  return res.json(new ApiResponse(
+    200,
+    'Phone number verified successfully.',
+    formatContactState(result.user)
+  ));
 });
 
 /**
@@ -269,31 +380,54 @@ exports.resetPassword = asyncHandler(async (req, res) => {
  * GET /api/auth/me
  */
 exports.getMe = asyncHandler(async (req, res) => {
-  const { _id, username, name, email, phone, role, avatar, authProvider, isEmailVerified, createdAt } = req.user;
-  return res.json(new ApiResponse(200, 'Profile fetched successfully.', {
-    id: _id, username, name, email, phone, role, avatar, authProvider, isEmailVerified, createdAt,
-  }));
+  return res.json(new ApiResponse(200, 'Profile fetched successfully.', formatUser(req.user)));
 });
 
 /**
  * PUT /api/auth/me
  */
 exports.updateMe = asyncHandler(async (req, res) => {
-  const { name, phone } = req.body;
-  const updatedUser = await User.findByIdAndUpdate(
-    req.user._id,
-    { name, phone },
-    { new: true, runValidators: true }
-  );
-  return res.json(new ApiResponse(200, 'Profile updated successfully.', {
-    id:           updatedUser._id,
-    username:     updatedUser.username,
-    name:         updatedUser.name,
-    email:        updatedUser.email,
-    phone:        updatedUser.phone,
-    avatar:       updatedUser.avatar,
-    authProvider: updatedUser.authProvider,
-  }));
+  const user = await User.findById(req.user._id);
+  if (!user) throw new ApiError(404, 'User not found.');
+
+  const hasField = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
+
+  if (hasField('name')) user.name = req.body.name;
+
+  let phoneChanged = false;
+  if (hasField('phone')) {
+    const nextPhone = req.body.phone === null || req.body.phone === ''
+      ? null
+      : normalizePhone(req.body.phone);
+    phoneChanged = (user.phone || null) !== nextPhone;
+
+    if (phoneChanged) {
+      user.phone = nextPhone;
+      user.isPhoneVerified = false;
+
+      if (user.preferredCommunication === COMMUNICATION_CHANNELS.PHONE) {
+        if (user.email && user.isEmailVerified) {
+          user.preferredCommunication = COMMUNICATION_CHANNELS.EMAIL;
+        } else {
+          throw new ApiError(400, 'Change preferred communication before changing or removing the phone number.');
+        }
+      }
+    }
+  }
+
+  if (hasField('preferredCommunication')) {
+    if (
+      req.body.preferredCommunication === COMMUNICATION_CHANNELS.PHONE
+      && (!user.phone || !user.isPhoneVerified)
+    ) {
+      throw new ApiError(400, 'Phone communication requires a verified phone number.');
+    }
+    user.preferredCommunication = req.body.preferredCommunication;
+  }
+
+  await user.save();
+  if (phoneChanged) await tokenService.deletePhoneVerificationTokens(user._id);
+  return res.json(new ApiResponse(200, 'Profile updated successfully.', formatUser(user)));
 });
 
 /**

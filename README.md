@@ -6,6 +6,7 @@ A production-ready REST API for an E-Learning platform built with Node.js, Expre
 
 - **Course Management & STEAM Taxonomy**: Support for Course categories (`science`, `technology`, `engineering`, `arts`, `mathematics`) and canonical subcategories, search, filtering, level selection, and intake windows.
 - **Student Registration & Auth**: Email/password registration with token verification, Google OAuth sign-in, and role-based access control (`student` and `admin`).
+- **Secure Phone Verification (OTP)**: Authenticated phone verification via 6-digit cryptographic OTPs with HMAC-SHA256 storage, 5-minute TTL, 5-attempt lockouts, 60s resend cooldowns, and provider-neutral transport boundary (`SmsService`).
 - **Enrollment Management**: Student enrollment submission with optional PDF academic document uploads, site selection, and administrative accept/reject workflows.
 - **Interactive Swagger Documentation**: Built-in Swagger UI available at `/api-docs`.
 - **Postman Support**: Pre-configured `postman_collection.json` and `postman_environment.json`.
@@ -83,6 +84,15 @@ The server will start on `http://localhost:5000`.
   "maxStudents": 30
 }
 ```
+
+## SMS Transport & Provider Readiness (Phase 3A)
+
+The backend phone OTP architecture is provider-independent and fully verified. In development/staging environments, SMS transport remains disabled (`SMS_ENABLED=false`).
+
+To enable real SMS delivery in production:
+1. Set `SMS_ENABLED=true` in environment configuration.
+2. Configure `SMS_PROVIDER`, `SMS_API_BASE_URL`, `SMS_API_KEY`, and `SMS_SENDER_ID`.
+3. Refer to [`docs/SMS_PROVIDER_ACTIVATION.md`](./docs/SMS_PROVIDER_ACTIVATION.md) for the provider selection checklist and integration steps.
 
 ---
 

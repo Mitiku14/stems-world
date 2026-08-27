@@ -1,5 +1,5 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-const { COURSE_CATEGORIES } = require('../constants');
+const { COURSE_CATEGORIES, COMMUNICATION_CHANNELS } = require('../constants');
 
 const courseTaxonomyProperties = Object.fromEntries(
   COURSE_CATEGORIES.map((category) => [
@@ -176,11 +176,23 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             username: { type: 'string', example: 'john_doe' },
             name: { type: 'string', example: 'John Doe' },
             email: { type: 'string', format: 'email', example: 'john@example.com' },
-            phone: { type: 'string', example: '+1234567890', nullable: true },
+            phone: {
+              type: 'string',
+              pattern: '^\\+[1-9]\\d{7,14}$',
+              example: '+251912345678',
+              nullable: true,
+            },
             role: { type: 'string', enum: ['student', 'admin'], example: 'student' },
             avatar: { type: 'string', example: 'https://lh3.googleusercontent.com/...', nullable: true },
             authProvider: { type: 'string', enum: ['local', 'google'], example: 'local' },
             isEmailVerified: { type: 'boolean', example: true },
+            isPhoneVerified: { type: 'boolean', example: false },
+            preferredCommunication: {
+              type: 'string',
+              enum: Object.values(COMMUNICATION_CHANNELS),
+              default: COMMUNICATION_CHANNELS.EMAIL,
+              example: COMMUNICATION_CHANNELS.EMAIL,
+            },
             isActive: { type: 'boolean', example: true },
             createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
           },

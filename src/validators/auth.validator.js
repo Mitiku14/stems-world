@@ -1,4 +1,6 @@
 const { body } = require('express-validator');
+const { COMMUNICATION_CHANNELS } = require('../constants');
+const normalizePhone = require('../utils/normalizePhone');
 
 const passwordRules = (field) => [
   body(field).notEmpty().withMessage('Password is required'),
@@ -63,11 +65,32 @@ const updateProfile = [
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty')
     .isLength({ max: 100 }).withMessage('Name cannot exceed 100 characters'),
 
-  body('phone').optional().trim().isMobilePhone().withMessage('Please provide a valid phone number'),
+  body('phone')
+    .optional({ nullable: true })
+    .customSanitizer((value) => (typeof value === 'string' ? value.trim() : value))
+    .custom((value) => {
+      if (value === null || value === '') return true;
+      normalizePhone(value);
+      return true;
+    }).withMessage('Please provide a valid Ethiopian local or international phone number')
+    .customSanitizer((value) => {
+      if (value === null || value === '') return null;
+      try {
+        return normalizePhone(value);
+      } catch {
+        return value;
+      }
+    }),
+
+  body('preferredCommunication')
+    .optional()
+    .isIn(Object.values(COMMUNICATION_CHANNELS))
+    .withMessage('Preferred communication must be email or phone'),
 
   body('email').not().exists().withMessage('Email cannot be changed via this endpoint'),
   body('password').not().exists().withMessage('Use the change-password endpoint'),
   body('role').not().exists().withMessage('Role cannot be changed'),
+  body('isPhoneVerified').not().exists().withMessage('Phone verification cannot be changed directly'),
 ];
 
 const changePassword = [
@@ -87,6 +110,14 @@ const googleSignIn = [
   body('idToken').trim().notEmpty().withMessage('Google ID token is required'),
 ];
 
+const verifyPhone = [
+  body('code')
+    .trim()
+    .notEmpty().withMessage('Verification code is required')
+    .isString().withMessage('Verification code must be a string')
+    .matches(/^\d{6}$/).withMessage('Verification code must be exactly 6 digits'),
+];
+
 module.exports = {
   register,
   login,
@@ -95,4 +126,5 @@ module.exports = {
   updateProfile,
   changePassword,
   googleSignIn,
+  verifyPhone,
 };

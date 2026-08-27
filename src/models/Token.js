@@ -25,6 +25,19 @@ const tokenSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+
+    attempts: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // Present only for phoneVerification tokens. It binds an OTP to the
+    // exact canonical phone identity that was current when the OTP was issued.
+    targetPhone: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
@@ -33,5 +46,13 @@ const tokenSchema = new mongoose.Schema(
 tokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 tokenSchema.index({ token: 1 });
 tokenSchema.index({ userId: 1, type: 1 });
+tokenSchema.index(
+  { userId: 1, type: 1 },
+  {
+    name: 'phone_verification_one_active_per_user',
+    unique: true,
+    partialFilterExpression: { type: TOKEN_TYPES.PHONE_VERIFICATION },
+  }
+);
 
 module.exports = mongoose.model('Token', tokenSchema);
