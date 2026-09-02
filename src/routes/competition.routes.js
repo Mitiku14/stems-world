@@ -25,12 +25,29 @@ const compRegValidator = require('../validators/competitionRegistration.validato
  *         schema: { type: string, enum: [individual, team] }
  *       - in: query
  *         name: scope
- *         schema: { type: string, enum: [local, national, international] }
+ *         schema:
+ *           $ref: '#/components/schemas/CompetitionScope'
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
  *         description: Competitions fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Competitions fetched successfully.' }
+ *                 data:
+ *                   type: object
+ *                   required: [competitions, pagination]
+ *                   properties:
+ *                     competitions:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/Competition' }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
  */
 router.get('/', listQuery, validate, ctrl.getCompetitions);
 
@@ -81,6 +98,15 @@ router.get('/registrations/my', verifyToken, compRegCtrl.getMyRegistrations);
  *     responses:
  *       200:
  *         description: Competition fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Competition fetched successfully.' }
+ *                 data: { $ref: '#/components/schemas/Competition' }
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
@@ -147,7 +173,7 @@ router.post('/:id/register', optionalAuth, compRegValidator.submitRegistrationRu
  * /api/competitions:
  *   post:
  *     summary: Create a competition
- *     description: registrationOpenDate and registrationCloseDate are required. The open date must be strictly earlier than the close date; the close date cannot be later than eventStartDate.
+ *     description: registrationOpenDate and registrationCloseDate are required. Every supplied round requires eventStartsDate and eventEndDate, with strict start-before-end chronology and containment within whichever overall event boundaries are supplied.
  *     tags: [Admin — Competitions]
  *     security:
  *       - BearerAuth: []

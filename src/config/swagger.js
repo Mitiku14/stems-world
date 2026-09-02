@@ -1,5 +1,5 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-const { COURSE_CATEGORIES, COMMUNICATION_CHANNELS } = require('../constants');
+const { COURSE_CATEGORIES, COMMUNICATION_CHANNELS, COMPETITION_SCOPES } = require('../constants');
 
 const courseTaxonomyProperties = Object.fromEntries(
   COURSE_CATEGORIES.map((category) => [
@@ -346,17 +346,35 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
         },
 
         // ── Competition ──────────────────────────────────────────────────────
+        CompetitionScope: {
+          type: 'string',
+          enum: COMPETITION_SCOPES,
+          example: 'regional',
+        },
+
         RoundDefinition: {
           type: 'object',
-          required: ['name', 'order'],
+          required: ['name', 'order', 'eventStartsDate', 'eventEndDate'],
           properties: {
             _id: {
               type: 'string',
               example: '64a1b2c3d4e5f6789012abcd',
-              description: 'Stable embedded round ID. Preserve this value when updating rounds after progression exists.',
+              description: 'Stable embedded round ID. Non-structural name/date edits preserve it even when omitted; structural identity cannot change after progression exists.',
             },
             name: { type: 'string', maxLength: 100, example: 'Qualifier' },
             order: { type: 'integer', minimum: 1, example: 1 },
+            eventStartsDate: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-10-15T09:00:00.000Z',
+              description: 'Required. Must be earlier than eventEndDate and not earlier than the Competition eventStartDate when present.',
+            },
+            eventEndDate: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-10-15T12:00:00.000Z',
+              description: 'Required. Must be later than eventStartsDate and not later than the Competition eventEndDate when present.',
+            },
           },
         },
 
@@ -378,7 +396,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             description: { type: 'string', example: 'Annual hackathon for schools.' },
             category: { type: 'string', enum: ['steam_innovation', 'olympiad'], example: 'olympiad' },
             type: { type: 'string', enum: ['individual', 'team'], example: 'individual' },
-            scope: { type: 'string', enum: ['local', 'national', 'international'] },
+            scope: { $ref: '#/components/schemas/CompetitionScope' },
             registrationOpenDate: {
               type: 'string',
               format: 'date-time',
@@ -396,7 +414,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
             rounds: {
               type: 'array',
               maxItems: 20,
-              description: 'Ordered embedded rounds. Existing _id values remain stable once participant progression references them.',
+              description: 'Ordered embedded rounds with required event dates. Non-structural edits preserve existing _id values, and progression prevents later structural identity changes.',
               items: { $ref: '#/components/schemas/RoundDefinition' },
             },
             maxRegistrations: { type: 'integer', nullable: true, minimum: 1, example: 100 },

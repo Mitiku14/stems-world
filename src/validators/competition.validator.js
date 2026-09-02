@@ -8,6 +8,63 @@ const {
 } = require('../constants');
 const Competition = require('../models/Competition');
 
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$/;
+
+const hasDateValue = (value) => value !== undefined && value !== null && value !== '';
+
+const parseRoundDate = (value) => {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== 'string') return null;
+
+  const match = value.match(ISO_DATE_PATTERN);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth) return null;
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const validateRoundSchedule = (rounds, overallDates = {}) => {
+  if (!Array.isArray(rounds)) return;
+
+  const competitionStart = hasDateValue(overallDates.eventStartDate)
+    ? new Date(overallDates.eventStartDate)
+    : null;
+  const competitionEnd = hasDateValue(overallDates.eventEndDate)
+    ? new Date(overallDates.eventEndDate)
+    : null;
+
+  rounds.forEach((round, index) => {
+    if (!round || typeof round !== 'object' || Array.isArray(round)) return;
+
+    if (!hasDateValue(round.eventStartsDate)) {
+      throw new Error(`Round ${index + 1} eventStartsDate is required`);
+    }
+    if (!hasDateValue(round.eventEndDate)) {
+      throw new Error(`Round ${index + 1} eventEndDate is required`);
+    }
+
+    const roundStart = parseRoundDate(round.eventStartsDate);
+    const roundEnd = parseRoundDate(round.eventEndDate);
+    if (!roundStart) throw new Error(`Round ${index + 1} eventStartsDate must be a valid ISO 8601 date`);
+    if (!roundEnd) throw new Error(`Round ${index + 1} eventEndDate must be a valid ISO 8601 date`);
+    if (roundStart >= roundEnd) {
+      throw new Error(`Round ${index + 1} eventStartsDate must be earlier than eventEndDate`);
+    }
+    if (competitionStart && !Number.isNaN(competitionStart.getTime()) && roundStart < competitionStart) {
+      throw new Error(`Round ${index + 1} eventStartsDate cannot be earlier than eventStartDate`);
+    }
+    if (competitionEnd && !Number.isNaN(competitionEnd.getTime()) && roundEnd > competitionEnd) {
+      throw new Error(`Round ${index + 1} eventEndDate cannot be later than the competition eventEndDate`);
+    }
+  });
+};
+
 const competitionRoundsRule = () =>
   body('rounds')
     .optional()
@@ -50,6 +107,8 @@ const competitionRoundsRule = () =>
         orders.push(order);
       });
 
+      validateRoundSchedule(rounds);
+
       if (new Set(suppliedIds).size !== suppliedIds.length) {
         throw new Error('Round IDs must be unique within a competition');
       }
@@ -70,7 +129,7 @@ const validateDateOrder = (isUpdate = false) =>
     let dates = req.body;
     if (isUpdate && mongoose.Types.ObjectId.isValid(req.params.id)) {
       const existing = await Competition.findById(req.params.id)
-        .select('registrationOpenDate registrationCloseDate eventStartDate eventEndDate')
+        .select('registrationOpenDate registrationCloseDate eventStartDate eventEndDate rounds')
         .lean();
       if (existing) dates = { ...existing, ...req.body };
     }
@@ -89,6 +148,7 @@ const validateDateOrder = (isUpdate = false) =>
     if (registrationClose && eventStart && registrationClose > eventStart) {
       throw new Error('registrationCloseDate cannot be later than eventStartDate');
     }
+    validateRoundSchedule(dates.rounds, dates);
     return true;
   });
 

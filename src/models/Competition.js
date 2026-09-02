@@ -19,6 +19,20 @@ const roundSchema = new mongoose.Schema(
       required: [true, 'Round order is required'],
       min: [1, 'Round order must be at least 1'],
     },
+    eventStartsDate: {
+      type: Date,
+      required: [true, 'Round event start date is required'],
+    },
+    eventEndDate: {
+      type: Date,
+      required: [true, 'Round event end date is required'],
+      validate: {
+        validator(value) {
+          return !value || !this.eventStartsDate || this.eventStartsDate < value;
+        },
+        message: 'Round event start date must be earlier than round event end date',
+      },
+    },
   },
   { _id: true }
 );
@@ -125,6 +139,32 @@ const competitionSchema = new mongoose.Schema(
             return orders.every((val, idx) => val === idx + 1);
           },
           message: 'Round orders must be unique contiguous integers starting at 1 (1, 2, 3... N)',
+        },
+        {
+          validator(rounds) {
+            return rounds.every((round) => (
+              !round.eventStartsDate
+              || !round.eventEndDate
+              || round.eventStartsDate < round.eventEndDate
+            ));
+          },
+          message: 'Each round eventStartsDate must be earlier than its eventEndDate',
+        },
+        {
+          validator(rounds) {
+            return !this.eventStartDate || rounds.every((round) => (
+              !round.eventStartsDate || round.eventStartsDate >= this.eventStartDate
+            ));
+          },
+          message: 'Round eventStartsDate cannot be earlier than the competition eventStartDate',
+        },
+        {
+          validator(rounds) {
+            return !this.eventEndDate || rounds.every((round) => (
+              !round.eventEndDate || round.eventEndDate <= this.eventEndDate
+            ));
+          },
+          message: 'Round eventEndDate cannot be later than the competition eventEndDate',
         },
       ],
     },

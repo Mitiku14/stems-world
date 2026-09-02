@@ -43,7 +43,13 @@ const COURSE_LEVELS     = ['beginner', 'intermediate', 'advanced', 'all'];
 
 const COMPETITION_CATEGORIES = ['steam_innovation', 'olympiad'];
 const COMPETITION_TYPES = ['individual', 'team'];
-const COMPETITION_SCOPES = ['local', 'national', 'international'];
+const COMPETITION_SCOPES = Object.freeze([
+  'school_level',
+  'regional',
+  'national',
+  'continental',
+  'international',
+]);
 const COMPETITION_STATUSES = ['draft', 'published', 'completed', 'cancelled'];
 const COMPETITION_PROGRESSION_STATUSES = ['not_started', 'in_progress', 'eliminated', 'completed'];
 const COMPETITION_ROUND_STATUSES = ['pending', 'passed', 'failed'];

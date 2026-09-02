@@ -21,7 +21,14 @@ const adminRoutes = require('../src/routes/admin.routes');
 const swaggerSpec = require('../src/config/swagger');
 const { COMPETITION_SEEDS, ensureSeedCompetitions } = require('../seed/competition.seed');
 const { buildMigrationPlan, captureSnapshot, migrate } = require('../scripts/migrate-competitions');
-const { COMPETITION_CATEGORIES, COMPETITION_TYPES, COMPETITION_STATUSES, COMPETITION_PROGRESSION_STATUSES } = require('../src/constants');
+const { auditCompetitionMetadata } = require('../scripts/migrate-competition-metadata');
+const {
+  COMPETITION_CATEGORIES,
+  COMPETITION_TYPES,
+  COMPETITION_SCOPES,
+  COMPETITION_STATUSES,
+  COMPETITION_PROGRESSION_STATUSES,
+} = require('../src/constants');
 
 const validDates = {
   registrationOpenDate: '2026-09-01T00:00:00.000Z',
@@ -29,6 +36,18 @@ const validDates = {
   eventStartDate: '2026-09-10T00:00:00.000Z',
   eventEndDate: '2026-09-11T00:00:00.000Z',
 };
+
+const validRoundDates = {
+  eventStartsDate: '2026-09-10T01:00:00.000Z',
+  eventEndDate: '2026-09-10T02:00:00.000Z',
+};
+
+const roundFixture = (name, order, extra = {}) => ({
+  name,
+  order,
+  ...validRoundDates,
+  ...extra,
+});
 
 // Helper to run express-validator chains
 const validate = async (chains, req) => {
@@ -73,7 +92,7 @@ test('Competition schema enforces category, type, status, and round contiguous o
     title: 'Test Comp 1',
     category: 'invalid_cat',
     type: 'individual',
-    scope: 'local',
+    scope: 'school_level',
   });
   assert.equal(compInvalidCat.validateSync().errors['category'] !== undefined, true);
 
@@ -82,7 +101,7 @@ test('Competition schema enforces category, type, status, and round contiguous o
     title: 'Test Comp 2',
     category: 'olympiad',
     type: 'hackathon',
-    scope: 'local',
+    scope: 'school_level',
   });
   assert.equal(compInvalidType.validateSync().errors['type'] !== undefined, true);
 
@@ -91,10 +110,10 @@ test('Competition schema enforces category, type, status, and round contiguous o
     title: 'Test Comp 3',
     category: 'olympiad',
     type: 'individual',
-    scope: 'local',
+    scope: 'school_level',
     rounds: [
-      { name: 'Round 1', order: 1 },
-      { name: 'Round 3', order: 3 },
+      roundFixture('Round 1', 1),
+      roundFixture('Round 3', 3),
     ],
   });
   assert.equal(compBadRounds.validateSync().errors['rounds'] !== undefined, true);
@@ -106,12 +125,99 @@ test('Competition schema enforces category, type, status, and round contiguous o
     type: 'individual',
     scope: 'national',
     rounds: [
-      { name: 'Qualifier', order: 1 },
-      { name: 'Finals', order: 2 },
+      roundFixture('Qualifier', 1),
+      roundFixture('Finals', 2),
     ],
     ...validDates,
   });
   assert.equal(validComp.validateSync(), undefined);
+});
+
+test('Competition scope contract is shared and accepts exactly the five Phase A values', async () => {
+  const expectedScopes = ['school_level', 'regional', 'national', 'continental', 'international'];
+  assert.deepEqual(COMPETITION_SCOPES, expectedScopes);
+  assert.deepEqual(Competition.schema.path('scope').enumValues, expectedScopes);
+  assert.deepEqual(swaggerSpec.components.schemas.CompetitionScope.enum, expectedScopes);
+
+  for (const scope of expectedScopes) {
+    const competition = new Competition({
+      title: `Scope ${scope}`,
+      category: 'olympiad',
+      type: 'individual',
+      scope,
+      ...validDates,
+    });
+    assert.equal(competition.validateSync(), undefined);
+
+    const validCreate = await validate(competitionValidator.createCompetitionRules, {
+      body: {
+        title: `Valid Scope Create ${scope}`,
+        category: 'olympiad',
+        type: 'individual',
+        scope,
+        ...validDates,
+      },
+    });
+    const validUpdate = await validate(competitionValidator.updateCompetitionRules, {
+      params: { id: 'validation-only' },
+      body: { scope },
+    });
+    const validQuery = await validate(competitionValidator.listQuery, {
+      query: { scope },
+    });
+    for (const result of [validCreate, validUpdate, validQuery]) {
+      assert.equal(result.isEmpty(), true, `${scope} should be accepted`);
+    }
+  }
+
+  for (const invalidScope of ['institutional', 'local', 'global']) {
+    const invalidModel = new Competition({
+      title: `Invalid Scope ${invalidScope}`,
+      category: 'olympiad',
+      type: 'individual',
+      scope: invalidScope,
+      ...validDates,
+    });
+    assert.match(invalidModel.validateSync().errors.scope.message, /not a valid enum value/);
+
+    const invalidCreate = await validate(competitionValidator.createCompetitionRules, {
+      body: {
+        title: `Invalid Scope Create ${invalidScope}`,
+        category: 'olympiad',
+        type: 'individual',
+        scope: invalidScope,
+        ...validDates,
+      },
+    });
+    const invalidUpdate = await validate(competitionValidator.updateCompetitionRules, {
+      params: { id: 'validation-only' },
+      body: { scope: invalidScope },
+    });
+    const invalidQuery = await validate(competitionValidator.listQuery, {
+      query: { scope: invalidScope },
+    });
+    for (const result of [invalidCreate, invalidUpdate, invalidQuery]) {
+      assert.equal(result.isEmpty(), false);
+      assert.equal(result.array().some(({ path: errorPath }) => errorPath === 'scope'), true);
+    }
+  }
+
+  const emptyCreate = await validate(competitionValidator.createCompetitionRules, {
+    body: {
+      title: 'Empty Scope Create',
+      category: 'olympiad',
+      type: 'individual',
+      scope: '',
+      ...validDates,
+    },
+  });
+  const emptyUpdate = await validate(competitionValidator.updateCompetitionRules, {
+    params: { id: 'validation-only' },
+    body: { scope: '' },
+  });
+  assert.equal(emptyCreate.array().some(({ path: errorPath }) => errorPath === 'scope'), true);
+  assert.equal(emptyUpdate.array().some(({ path: errorPath }) => errorPath === 'scope'), true);
+  assert.equal(COMPETITION_SEEDS.every(({ scope }) => COMPETITION_SCOPES.includes(scope)), true);
 });
 
 test('Competition validator accepts valid category, type, and maxRegistrations', async () => {
@@ -124,13 +230,87 @@ test('Competition validator accepts valid category, type, and maxRegistrations',
       maxRegistrations: 50,
       ...validDates,
       rounds: [
-        { name: 'Stage 1', order: 1 },
-        { name: 'Stage 2', order: 2 },
+        roundFixture('Stage 1', 1),
+        roundFixture('Stage 2', 2),
       ],
     },
   };
   const result = await validate(competitionValidator.createCompetitionRules, req);
   assert.equal(result.isEmpty(), true);
+});
+
+test('Competition rounds require valid strict dates within supplied overall event boundaries', async () => {
+  const basePayload = {
+    title: 'Round Schedule Contract',
+    category: 'olympiad',
+    type: 'individual',
+    scope: 'continental',
+    ...validDates,
+  };
+  const invalidRounds = [
+    { round: { name: 'Missing Start', order: 1, eventEndDate: validRoundDates.eventEndDate }, message: /eventStartsDate is required/ },
+    { round: { name: 'Missing End', order: 1, eventStartsDate: validRoundDates.eventStartsDate }, message: /eventEndDate is required/ },
+    { round: roundFixture('Invalid Start', 1, { eventStartsDate: 'not-a-date' }), message: /valid ISO 8601 date/ },
+    { round: roundFixture('Invalid End', 1, { eventEndDate: 'not-a-date' }), message: /valid ISO 8601 date/ },
+    { round: roundFixture('Equal Dates', 1, { eventEndDate: validRoundDates.eventStartsDate }), message: /earlier than eventEndDate/ },
+    { round: roundFixture('Reversed Dates', 1, { eventStartsDate: validRoundDates.eventEndDate }), message: /earlier than eventEndDate/ },
+    { round: roundFixture('Before Overall Start', 1, { eventStartsDate: '2026-09-09T23:00:00.000Z' }), message: /earlier than eventStartDate/ },
+    { round: roundFixture('After Overall End', 1, { eventEndDate: '2026-09-11T01:00:00.000Z' }), message: /later than the competition eventEndDate/ },
+  ];
+
+  for (const { round, message } of invalidRounds) {
+    const createResult = await validate(competitionValidator.createCompetitionRules, {
+      body: { ...basePayload, rounds: [round] },
+    });
+    assert.equal(createResult.isEmpty(), false);
+    assert.match(createResult.array().map(({ msg }) => msg).join(' '), message);
+
+    const updateResult = await validate(competitionValidator.updateCompetitionRules, {
+      params: { id: 'validation-only' },
+      body: { ...validDates, rounds: [round] },
+    });
+    assert.equal(updateResult.isEmpty(), false);
+  }
+
+  await new Competition({ ...basePayload, rounds: [roundFixture('Valid Round', 1)] }).validate();
+  await new Competition({ ...basePayload, rounds: [] }).validate();
+  await new Competition({
+    ...basePayload,
+    eventStartDate: null,
+    eventEndDate: null,
+    rounds: [roundFixture('Valid Without Overall Bounds', 1)],
+  }).validate();
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[0].round] }).validate(),
+    /Round event start date is required/
+  );
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[2].round] }).validate(),
+    /Cast to date failed/
+  );
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[3].round] }).validate(),
+    /Cast to date failed/
+  );
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[4].round] }).validate(),
+    /earlier than round event end date|earlier than its eventEndDate/
+  );
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[6].round] }).validate(),
+    /cannot be earlier than the competition eventStartDate/
+  );
+  await assert.rejects(
+    new Competition({ ...basePayload, rounds: [invalidRounds[7].round] }).validate(),
+    /cannot be later than the competition eventEndDate/
+  );
+
+  const startBoundaryOnly = { ...basePayload, eventEndDate: null, rounds: [invalidRounds[6].round] };
+  const endBoundaryOnly = { ...basePayload, eventStartDate: null, rounds: [invalidRounds[7].round] };
+  assert.equal((await validate(competitionValidator.createCompetitionRules, { body: startBoundaryOnly })).isEmpty(), false);
+  assert.equal((await validate(competitionValidator.createCompetitionRules, { body: endBoundaryOnly })).isEmpty(), false);
+  await assert.rejects(new Competition(startBoundaryOnly).validate(), /competition eventStartDate/);
+  await assert.rejects(new Competition(endBoundaryOnly).validate(), /competition eventEndDate/);
 });
 
 test('real Competition create path and model reject duplicate round IDs while accepting unique supplied IDs', async () => {
@@ -144,12 +324,12 @@ test('real Competition create path and model reject duplicate round IDs while ac
     ...validDates,
   };
   const duplicateRounds = [
-    { _id: String(duplicateId), name: 'Qualifier', order: 1 },
-    { _id: String(duplicateId), name: 'Final', order: 2 },
+    roundFixture('Qualifier', 1, { _id: String(duplicateId) }),
+    roundFixture('Final', 2, { _id: String(duplicateId) }),
   ];
   const uniqueRounds = [
-    { _id: String(duplicateId), name: 'Qualifier', order: 1 },
-    { _id: String(uniqueId), name: 'Final', order: 2 },
+    roundFixture('Qualifier', 1, { _id: String(duplicateId) }),
+    roundFixture('Final', 2, { _id: String(uniqueId) }),
   ];
 
   const duplicateHttp = await validate(competitionValidator.createCompetitionRules, {
@@ -169,8 +349,8 @@ test('real Competition create path and model reject duplicate round IDs while ac
     body: {
       ...basePayload,
       rounds: [
-        { _id: 'not-an-object-id', name: 'Qualifier', order: 1 },
-        { name: 'Final', order: 2 },
+        roundFixture('Qualifier', 1, { _id: 'not-an-object-id' }),
+        roundFixture('Final', 2),
       ],
     },
   });
@@ -179,16 +359,16 @@ test('real Competition create path and model reject duplicate round IDs while ac
 
   for (const rounds of [
     [
-      { name: 'Same Name', order: 1 },
-      { name: ' same name ', order: 2 },
+      roundFixture('Same Name', 1),
+      roundFixture(' same name ', 2),
     ],
     [
-      { name: 'Qualifier', order: 1 },
-      { name: 'Final', order: 1 },
+      roundFixture('Qualifier', 1),
+      roundFixture('Final', 1),
     ],
     [
-      { name: 'Qualifier', order: 1 },
-      { name: 'Final', order: 3 },
+      roundFixture('Qualifier', 1),
+      roundFixture('Final', 3),
     ],
   ]) {
     const invalidRounds = await validate(competitionValidator.createCompetitionRules, {
@@ -351,7 +531,7 @@ test('Competition create requires registration dates and enforces strict chronol
     title: 'Date Contract Competition',
     category: 'steam_innovation',
     type: 'individual',
-    scope: 'local',
+    scope: 'school_level',
   };
 
   assert.equal(await validationStatus(competitionValidator.createCompetitionRules, {
@@ -398,21 +578,83 @@ test('Competition create requires registration dates and enforces strict chronol
 
 test('Competition partial date update validates the final stored chronology', async () => {
   const originalFindById = Competition.findById;
+  const storedState = {
+    ...validDates,
+    rounds: [roundFixture('Stored Qualifier', 1)],
+  };
   Competition.findById = () => ({
     select: () => ({
-      lean: async () => ({ ...validDates }),
+      lean: async () => storedState,
     }),
   });
 
   try {
-    const status = await validationStatus(competitionValidator.updateCompetitionRules, {
+    const invalidRegistrationDates = await validationStatus(competitionValidator.updateCompetitionRules, {
       params: { id: new mongoose.Types.ObjectId().toString() },
       body: { registrationCloseDate: '2026-08-20T00:00:00.000Z' },
     });
-    assert.equal(status, 422);
+    const invalidOverallStart = await validationStatus(competitionValidator.updateCompetitionRules, {
+      params: { id: new mongoose.Types.ObjectId().toString() },
+      body: { eventStartDate: '2026-09-10T01:30:00.000Z' },
+    });
+    const invalidOverallEnd = await validationStatus(competitionValidator.updateCompetitionRules, {
+      params: { id: new mongoose.Types.ObjectId().toString() },
+      body: { eventEndDate: '2026-09-10T01:30:00.000Z' },
+    });
+    const invalidReplacementRound = await validationStatus(competitionValidator.updateCompetitionRules, {
+      params: { id: new mongoose.Types.ObjectId().toString() },
+      body: {
+        rounds: [roundFixture('Replacement Qualifier', 1, {
+          eventStartsDate: '2026-09-09T23:00:00.000Z',
+        })],
+      },
+    });
+    const validUnrelatedUpdate = await validationStatus(competitionValidator.updateCompetitionRules, {
+      params: { id: new mongoose.Types.ObjectId().toString() },
+      body: { description: 'Final stored schedule remains valid.' },
+    });
+
+    assert.equal(invalidRegistrationDates, 422);
+    assert.equal(invalidOverallStart, 422);
+    assert.equal(invalidOverallEnd, 422);
+    assert.equal(invalidReplacementRound, 422);
+    assert.equal(validUnrelatedUpdate, 200);
   } finally {
     Competition.findById = originalFindById;
   }
+});
+
+test('legacy local scope and undated rounds remain readable but fail strict validation before deployment', async () => {
+  const legacy = Competition.hydrate({
+    _id: new mongoose.Types.ObjectId(),
+    title: 'Legacy Round Schedule',
+    category: 'olympiad',
+    type: 'individual',
+    scope: 'local',
+    ...validDates,
+    rounds: [{ name: 'Legacy Qualifier', order: 1 }],
+  });
+  assert.equal(legacy.scope, 'local');
+  assert.equal(legacy.rounds[0].eventStartsDate, undefined);
+  assert.equal(legacy.rounds[0].eventEndDate, undefined);
+  legacy.description = 'An unrelated edit still validates the final document.';
+  await assert.rejects(legacy.validate(), (error) => {
+    assert.ok(error.errors.scope);
+    assert.ok(error.errors['rounds.0.eventStartsDate']);
+    assert.ok(error.errors['rounds.0.eventEndDate']);
+    return true;
+  });
+
+  const legacyLocalWithDatedRounds = Competition.hydrate({
+    _id: new mongoose.Types.ObjectId(),
+    title: 'Legacy Local With Dates',
+    category: 'olympiad',
+    type: 'individual',
+    scope: 'local',
+    ...validDates,
+    rounds: [roundFixture('Dated Legacy Round', 1)],
+  });
+  await assert.rejects(legacyLocalWithDatedRounds.validate(), /not a valid enum value/);
 });
 
 test('Competition seeder is non-destructive, idempotent, and preserves existing IDs and admin records', async () => {
@@ -559,6 +801,75 @@ test('Competition migration rejects production before opening a database connect
   }
 });
 
+test('Competition metadata audit is read-only and reports every Phase A legacy hazard with stable IDs', () => {
+  const competitionId = new mongoose.Types.ObjectId();
+  const roundIds = Array.from({ length: 7 }, () => new mongoose.Types.ObjectId());
+  const report = auditCompetitionMetadata([
+    {
+      _id: competitionId,
+      title: 'Legacy Metadata Audit Target',
+      scope: 'local',
+      eventStartDate: '2026-09-10T00:00:00.000Z',
+      eventEndDate: '2026-09-11T00:00:00.000Z',
+      rounds: [
+        { _id: roundIds[0], name: 'Missing Both', order: 1 },
+        { _id: roundIds[1], name: 'Invalid Start', order: 2, eventStartsDate: 'bad-start', eventEndDate: '2026-09-10T02:00:00.000Z' },
+        { _id: roundIds[2], name: 'Invalid End', order: 3, eventStartsDate: '2026-09-10T03:00:00.000Z', eventEndDate: 'bad-end' },
+        { _id: roundIds[3], name: 'Equal', order: 4, eventStartsDate: '2026-09-10T04:00:00.000Z', eventEndDate: '2026-09-10T04:00:00.000Z' },
+        { _id: roundIds[4], name: 'Reversed', order: 5, eventStartsDate: '2026-09-10T06:00:00.000Z', eventEndDate: '2026-09-10T05:00:00.000Z' },
+        { _id: roundIds[5], name: 'Before Boundary', order: 6, eventStartsDate: '2026-09-09T23:00:00.000Z', eventEndDate: '2026-09-10T01:00:00.000Z' },
+        { _id: roundIds[6], name: 'After Boundary', order: 7, eventStartsDate: '2026-09-10T23:00:00.000Z', eventEndDate: '2026-09-11T01:00:00.000Z' },
+      ],
+    },
+    { _id: new mongoose.Types.ObjectId(), title: 'Institutional Scope', scope: 'institutional', rounds: [] },
+    { _id: new mongoose.Types.ObjectId(), title: 'Unknown Scope', scope: 'global', rounds: [] },
+    { _id: new mongoose.Types.ObjectId(), title: 'Missing Scope', rounds: [] },
+    {
+      _id: new mongoose.Types.ObjectId(),
+      title: 'Valid Metadata',
+      scope: 'school_level',
+      eventStartDate: '2026-09-10T00:00:00.000Z',
+      eventEndDate: '2026-09-11T00:00:00.000Z',
+      rounds: [roundFixture('Valid', 1)],
+    },
+  ]);
+
+  assert.equal(report.mode, 'DRY_RUN_AUDIT_ONLY');
+  assert.equal(report.applySupported, false);
+  assert.equal(report.writesPerformed, 0);
+  assert.equal(report.indexChanges, 0);
+  assert.equal(report.deploymentBlocked, true);
+  const issueTypes = new Set(report.issues.map(({ type }) => type));
+  for (const expectedType of [
+    'legacy_local_scope',
+    'unknown_scope',
+    'missing_scope',
+    'missing_round_event_start',
+    'missing_round_event_end',
+    'invalid_round_event_start',
+    'invalid_round_event_end',
+    'equal_round_dates',
+    'reversed_round_dates',
+    'round_before_competition_start',
+    'round_after_competition_end',
+  ]) {
+    assert.equal(issueTypes.has(expectedType), true, `Expected audit issue ${expectedType}`);
+  }
+  assert.equal(
+    report.issues.some(({ type, currentScope }) => type === 'unknown_scope' && currentScope === 'institutional'),
+    true
+  );
+  assert.equal(report.issues.some(({ currentScope }) => currentScope === 'school_level'), false);
+  const inspected = report.inspectedCompetitions.find(({ competitionId: id }) => id === String(competitionId));
+  assert.deepEqual(inspected.roundIds, roundIds.map(String));
+  assert.equal(
+    report.issues.filter(({ roundId }) => roundId).every(({ competitionId: id, roundId }) => (
+      id === String(competitionId) && roundIds.map(String).includes(roundId)
+    )),
+    true
+  );
+});
+
 test('Swagger and generated Postman require valid Competition registration dates and current enums', () => {
   const createOperation = swaggerSpec.paths['/api/competitions'].post;
   assert.equal(
@@ -570,6 +881,14 @@ test('Swagger and generated Postman require valid Competition registration dates
     ['title', 'category', 'type', 'scope', 'registrationOpenDate', 'registrationCloseDate']
   );
   assert.equal(Object.hasOwn(createOperation.responses, '422'), true);
+  assert.deepEqual(
+    swaggerSpec.components.schemas.CompetitionScope.enum,
+    ['school_level', 'regional', 'national', 'continental', 'international']
+  );
+  assert.deepEqual(
+    swaggerSpec.components.schemas.RoundDefinition.required,
+    ['name', 'order', 'eventStartsDate', 'eventEndDate']
+  );
 
   const collection = JSON.parse(fs.readFileSync(path.join(__dirname, '../postman_collection.json'), 'utf8'));
   const requests = [];
@@ -587,6 +906,11 @@ test('Swagger and generated Postman require valid Competition registration dates
   assert.equal(Object.hasOwn(payload, 'eligibility'), false);
   assert.equal(new Date(payload.registrationOpenDate) < new Date(payload.registrationCloseDate), true);
   assert.equal(new Date(payload.registrationCloseDate) <= new Date(payload.eventStartDate), true);
+  assert.equal(payload.rounds.every(({ eventStartsDate, eventEndDate }) => (
+    new Date(eventStartsDate) < new Date(eventEndDate)
+    && new Date(eventStartsDate) >= new Date(payload.eventStartDate)
+    && new Date(eventEndDate) <= new Date(payload.eventEndDate)
+  )), true);
 });
 
 test('Concurrent registrations for the final slot serialize and roll back failed reservations', async () => {
@@ -836,9 +1160,9 @@ test('admin and student registration responses expose Competition rounds for cur
     _id: new mongoose.Types.ObjectId(),
     title: 'Frontend Round Display Competition',
     rounds: [
-      { _id: roundIds[0], name: 'Qualifier', order: 1 },
-      { _id: roundIds[1], name: 'Semifinal', order: 2 },
-      { _id: roundIds[2], name: 'Final', order: 3 },
+      roundFixture('Qualifier', 1, { _id: roundIds[0] }),
+      roundFixture('Semifinal', 2, { _id: roundIds[1] }),
+      roundFixture('Final', 3, { _id: roundIds[2] }),
     ],
   };
   const registration = {
@@ -878,8 +1202,8 @@ test('admin and student registration responses expose Competition rounds for cur
     assert.equal(String(adminRegistration.competitionId), String(competition._id));
     assert.equal(adminRegistration.competitionTitle, competition.title);
     assert.deepEqual(
-      adminRegistration.competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order })),
-      competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order }))
+      adminRegistration.competition.rounds.map((round) => ({ ...round, _id: String(round._id) })),
+      competition.rounds.map((round) => ({ ...round, _id: String(round._id) }))
     );
     const currentRound = adminRegistration.competition.rounds.find(
       ({ _id }) => String(_id) === String(adminRegistration.currentRound)
@@ -892,8 +1216,8 @@ test('admin and student registration responses expose Competition rounds for cur
     const studentRegistration = studentResult.body.data.registrations[0];
     assert.equal(studentResult.status, 200);
     assert.deepEqual(
-      studentRegistration.competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order })),
-      competition.rounds.map(({ _id, name, order }) => ({ _id: String(_id), name, order }))
+      studentRegistration.competition.rounds.map((round) => ({ ...round, _id: String(round._id) })),
+      competition.rounds.map((round) => ({ ...round, _id: String(round._id) }))
     );
   } finally {
     CompetitionRegistration.find = originals.find;
@@ -1044,8 +1368,8 @@ test('real Competition update controller preserves referenced round identity and
 
   const makeCompetition = () => {
     const rounds = [
-      { _id: new mongoose.Types.ObjectId(), name: 'Qualifier', order: 1 },
-      { _id: new mongoose.Types.ObjectId(), name: 'Final', order: 2 },
+      roundFixture('Qualifier', 1, { _id: new mongoose.Types.ObjectId() }),
+      roundFixture('Final', 2, { _id: new mongoose.Types.ObjectId() }),
     ];
     const competition = Competition.hydrate({
       _id: new mongoose.Types.ObjectId(),
@@ -1078,6 +1402,8 @@ test('real Competition update controller preserves referenced round identity and
     ...(includeIds && { _id: String(round._id) }),
     name: round.name,
     order: round.order,
+    eventStartsDate: round.eventStartsDate,
+    eventEndDate: round.eventEndDate,
   }));
 
   try {
@@ -1098,29 +1424,33 @@ test('real Competition update controller preserves referenced round identity and
     const uniqueSupplied = makeCompetition();
     const replacementIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
     const uniqueSuppliedResult = await updateRounds(uniqueSupplied, [
-      { _id: String(replacementIds[0]), name: 'Replacement Qualifier', order: 1 },
-      { _id: String(replacementIds[1]), name: 'Replacement Final', order: 2 },
+      roundFixture('Replacement Qualifier', 1, { _id: String(replacementIds[0]) }),
+      roundFixture('Replacement Final', 2, { _id: String(replacementIds[1]) }),
     ], false);
     assert.equal(uniqueSuppliedResult.status, 200);
     assert.deepEqual(uniqueSupplied.rounds.map(({ _id }) => String(_id)), replacementIds.map(String));
 
-    for (const includeIds of [true, false]) {
-      const competition = makeCompetition();
-      const referencedIds = competition.rounds.map(({ _id }) => String(_id));
-      const result = await updateRounds(competition, plainRounds(competition, includeIds));
-      assert.equal(result.status, 200);
-      assert.deepEqual(competition.rounds.map(({ _id }) => String(_id)), referencedIds);
-      assert.equal(referencedIds.every((id) => competition.rounds.some(({ _id }) => String(_id) === id)), true);
-    }
+    for (const progress of [false, true]) {
+      for (const includeIds of [true, false]) {
+        for (const editType of ['name', 'date']) {
+          const competition = makeCompetition();
+          const referencedIds = competition.rounds.map(({ _id }) => String(_id));
+          const payload = plainRounds(competition, includeIds);
+          if (editType === 'name') payload[0].name = 'Renamed Qualifier';
+          else payload[0].eventStartsDate = '2026-09-10T01:15:00.000Z';
 
-    const renamed = makeCompetition();
-    const renamedIds = renamed.rounds.map(({ _id }) => String(_id));
-    const renamedPayload = plainRounds(renamed);
-    renamedPayload[0].name = 'Renamed Qualifier';
-    const renamedResult = await updateRounds(renamed, renamedPayload);
-    assert.equal(renamedResult.status, 200);
-    assert.equal(renamed.rounds[0].name, 'Renamed Qualifier');
-    assert.deepEqual(renamed.rounds.map(({ _id }) => String(_id)), renamedIds);
+          const result = await updateRounds(competition, payload, progress);
+          assert.equal(result.status, 200, `${editType} edit should succeed`);
+          assert.deepEqual(
+            competition.rounds.map(({ _id }) => String(_id)),
+            referencedIds,
+            `${editType} edit must preserve IDs when progress=${progress} includeIds=${includeIds}`
+          );
+          if (editType === 'name') assert.equal(competition.rounds[0].name, 'Renamed Qualifier');
+          else assert.equal(competition.rounds[0].eventStartsDate.toISOString(), '2026-09-10T01:15:00.000Z');
+        }
+      }
+    }
 
     const unsafeCases = [
       (competition) => {
@@ -1143,14 +1473,25 @@ test('real Competition update controller preserves referenced round identity and
     const noProgress = makeCompetition();
     const originalIds = noProgress.rounds.map(({ _id }) => String(_id));
     const structuralEdit = [
-      { name: 'New Round 1', order: 1 },
-      { name: 'New Round 2', order: 2 },
-      { name: 'New Round 3', order: 3 },
+      roundFixture('New Round 1', 1),
+      roundFixture('New Round 2', 2),
+      roundFixture('New Round 3', 3),
     ];
     const noProgressResult = await updateRounds(noProgress, structuralEdit, false);
     assert.equal(noProgressResult.status, 200);
     assert.equal(noProgress.rounds.length, 3);
     assert.equal(noProgress.rounds.some(({ _id }) => originalIds.includes(String(_id))), false);
+
+    const removableBeforeProgress = makeCompetition();
+    const retainedRoundId = String(removableBeforeProgress.rounds[0]._id);
+    const removeResult = await updateRounds(
+      removableBeforeProgress,
+      plainRounds(removableBeforeProgress).slice(0, 1),
+      false
+    );
+    assert.equal(removeResult.status, 200);
+    assert.equal(removableBeforeProgress.rounds.length, 1);
+    assert.equal(String(removableBeforeProgress.rounds[0]._id), retainedRoundId);
   } finally {
     mongoose.connection.transaction = originals.transaction;
     Competition.findOneAndUpdate = originals.findOneAndUpdate;
@@ -1197,9 +1538,9 @@ test('roundless Competition blocks adding rounds after acceptance but permits it
     return competition;
   };
   const newRounds = [
-    { name: 'Qualifier', order: 1 },
-    { name: 'Semifinal', order: 2 },
-    { name: 'Final', order: 3 },
+    roundFixture('Qualifier', 1),
+    roundFixture('Semifinal', 2),
+    roundFixture('Final', 3),
   ];
   const update = (competition) => {
     currentCompetition = competition;
@@ -1223,7 +1564,10 @@ test('roundless Competition blocks adding rounds after acceptance but permits it
     const allowed = await update(editableCompetition);
     assert.equal(allowed.status, 200);
     assert.equal(editableCompetition.rounds.length, 3);
-    assert.deepEqual(editableCompetition.rounds.map(({ name, order }) => ({ name, order })), newRounds);
+    assert.deepEqual(
+      editableCompetition.rounds.map(({ name, order }) => ({ name, order })),
+      newRounds.map(({ name, order }) => ({ name, order }))
+    );
     assert.equal(editableCompetition.saveCalls, 1);
   } finally {
     mongoose.connection.transaction = originals.transaction;
@@ -1253,8 +1597,8 @@ test('real controllers serialize structural round update against approval and pr
       scope: 'national',
       ...validDates,
       rounds: [
-        { _id: oldRoundIds[0], name: 'Old Qualifier', order: 1 },
-        { _id: oldRoundIds[1], name: 'Old Final', order: 2 },
+        roundFixture('Old Qualifier', 1, { _id: oldRoundIds[0] }),
+        roundFixture('Old Final', 2, { _id: oldRoundIds[1] }),
       ],
       status: 'published',
       isActive: true,
@@ -1347,8 +1691,8 @@ test('real controllers serialize structural round update against approval and pr
       params: { id: String(state.competition._id) },
       body: {
         rounds: [
-          { _id: String(replacementIds[0]), name: 'New Qualifier', order: 1 },
-          { _id: String(replacementIds[1]), name: 'New Final', order: 2 },
+          roundFixture('New Qualifier', 1, { _id: String(replacementIds[0]) }),
+          roundFixture('New Final', 2, { _id: String(replacementIds[1]) }),
         ],
       },
     });
@@ -1396,7 +1740,7 @@ test('real approval controller uses new round IDs when a concurrent structural u
       type: 'individual',
       scope: 'national',
       ...validDates,
-      rounds: [{ _id: oldRoundId, name: 'Old Round', order: 1 }],
+      rounds: [roundFixture('Old Round', 1, { _id: oldRoundId })],
       status: 'published',
       isActive: true,
       capacityVersion: 0,
@@ -1476,8 +1820,8 @@ test('real approval controller uses new round IDs when a concurrent structural u
       params: { id: String(state.competition._id) },
       body: {
         rounds: [
-          { _id: String(newRoundIds[0]), name: 'New Qualifier', order: 1 },
-          { _id: String(newRoundIds[1]), name: 'New Final', order: 2 },
+          roundFixture('New Qualifier', 1, { _id: String(newRoundIds[0]) }),
+          roundFixture('New Final', 2, { _id: String(newRoundIds[1]) }),
         ],
       },
     });
@@ -1535,7 +1879,7 @@ test('real controllers serialize completion against approval in both winner orde
         type: 'individual',
         scope: 'national',
         ...validDates,
-        rounds: [{ _id: firstRoundId, name: 'Qualifier', order: 1 }],
+        rounds: [roundFixture('Qualifier', 1, { _id: firstRoundId })],
         status: 'published',
         isActive: true,
         capacityVersion: 0,
@@ -1702,18 +2046,22 @@ test('real Competition delete controller blocks registrations and certificates w
   }
 });
 
-test('real admin Competition list controller returns public and non-public lifecycle records', async () => {
+test('public and admin Competition lists sort newest-created first while admin includes every lifecycle state', async () => {
   const originals = {
     find: Competition.find,
     countDocuments: Competition.countDocuments,
   };
+  const sortSpecifications = [];
   const records = [
     { _id: 'draft-id', title: 'Draft Competition', status: 'draft', isActive: false },
     { _id: 'cancelled-id', title: 'Cancelled Competition', status: 'cancelled', isActive: true },
   ];
   Competition.find = () => {
     const chain = {
-      sort: () => chain,
+      sort: (specification) => {
+        sortSpecifications.push(specification);
+        return chain;
+      },
       skip: () => chain,
       limit: () => chain,
       lean: async () => records,
@@ -1723,14 +2071,63 @@ test('real admin Competition list controller returns public and non-public lifec
   Competition.countDocuments = async () => records.length;
 
   try {
-    const result = await invokeHandler(compCtrl.getAllCompetitions, {
+    const publicResult = await invokeHandler(compCtrl.getCompetitions, {
       query: { page: '1', limit: '10' },
     });
-    assert.equal(result.status, 200);
-    assert.deepEqual(result.body.data.competitions, records);
-    assert.deepEqual(result.body.data.pagination, { total: 2, page: 1, limit: 10, totalPages: 1 });
+    const adminResult = await invokeHandler(compCtrl.getAllCompetitions, {
+      query: { page: '1', limit: '10' },
+    });
+    assert.equal(publicResult.status, 200);
+    assert.equal(adminResult.status, 200);
+    assert.deepEqual(adminResult.body.data.competitions, records);
+    assert.deepEqual(adminResult.body.data.pagination, { total: 2, page: 1, limit: 10, totalPages: 1 });
+    assert.deepEqual(sortSpecifications, [{ createdAt: -1 }, { createdAt: -1 }]);
   } finally {
     Competition.find = originals.find;
+    Competition.countDocuments = originals.countDocuments;
+  }
+});
+
+test('public Competition list and detail responses expose both round event date fields', async () => {
+  const originals = {
+    find: Competition.find,
+    findOne: Competition.findOne,
+    countDocuments: Competition.countDocuments,
+  };
+  const competition = {
+    _id: new mongoose.Types.ObjectId(),
+    title: 'Public Round Date Contract',
+    scope: 'continental',
+    rounds: [roundFixture('Qualifier', 1, { _id: new mongoose.Types.ObjectId() })],
+  };
+  const listQuery = {
+    sort() { return listQuery; },
+    skip() { return listQuery; },
+    limit() { return listQuery; },
+    lean: async () => [competition],
+  };
+  Competition.find = () => listQuery;
+  Competition.findOne = () => ({ lean: async () => competition });
+  Competition.countDocuments = async () => 1;
+
+  try {
+    const listResult = await invokeHandler(compCtrl.getCompetitions, {
+      query: { page: '1', limit: '10' },
+    });
+    const detailResult = await invokeHandler(compCtrl.getCompetition, {
+      params: { id: String(competition._id) },
+    });
+    for (const returnedCompetition of [
+      listResult.body.data.competitions[0],
+      detailResult.body.data,
+    ]) {
+      assert.equal(returnedCompetition.scope, 'continental');
+      assert.equal(returnedCompetition.rounds[0].eventStartsDate, validRoundDates.eventStartsDate);
+      assert.equal(returnedCompetition.rounds[0].eventEndDate, validRoundDates.eventEndDate);
+    }
+  } finally {
+    Competition.find = originals.find;
+    Competition.findOne = originals.findOne;
     Competition.countDocuments = originals.countDocuments;
   }
 });
@@ -1743,6 +2140,12 @@ test('Competition frontend Swagger and Postman contracts expose round definition
 
   assert.ok(swaggerSpec.components.schemas.RoundDefinition);
   assert.ok(swaggerSpec.components.schemas.RoundProgress);
+  assert.deepEqual(
+    swaggerSpec.components.schemas.RoundDefinition.required,
+    ['name', 'order', 'eventStartsDate', 'eventEndDate']
+  );
+  assert.ok(swaggerSpec.components.schemas.RoundDefinition.properties.eventStartsDate);
+  assert.ok(swaggerSpec.components.schemas.RoundDefinition.properties.eventEndDate);
   assert.equal(
     swaggerSpec.components.schemas.Competition.properties.rounds.items.$ref,
     '#/components/schemas/RoundDefinition'
@@ -1764,6 +2167,16 @@ test('Competition frontend Swagger and Postman contracts expose round definition
   assert.equal(Object.hasOwn(swaggerSpec.components.schemas.Competition.properties, 'capacityVersion'), false);
   assert.ok(swaggerSpec.paths['/api/admin/competitions'].get);
   assert.ok(swaggerSpec.paths['/api/competitions/registrations/my'].get.responses['200'].content);
+  assert.equal(
+    swaggerSpec.paths['/api/competitions'].get.responses['200']
+      .content['application/json'].schema.properties.data.properties.competitions.items.$ref,
+    '#/components/schemas/Competition'
+  );
+  assert.equal(
+    swaggerSpec.paths['/api/competitions/{id}'].get.responses['200']
+      .content['application/json'].schema.properties.data.$ref,
+    '#/components/schemas/Competition'
+  );
 
   const adminRegistrations = swaggerSpec.paths['/api/admin/competition-registrations'].get;
   assert.equal(adminRegistrations.parameters.some(({ name }) => name === 'progressionStatus'), true);
@@ -1785,6 +2198,12 @@ test('Competition frontend Swagger and Postman contracts expose round definition
   }
 
   const collection = JSON.parse(fs.readFileSync(path.join(__dirname, '../postman_collection.json'), 'utf8'));
+  const competitionFolder = collection.item.find(({ name }) => name === '5. Competitions');
+  assert.ok(competitionFolder);
+  for (const scope of COMPETITION_SCOPES) {
+    assert.match(competitionFolder.description, new RegExp(scope));
+  }
+  assert.match(competitionFolder.description, /institutional and local values are invalid/);
   const requests = [];
   const collect = (items = []) => items.forEach((item) => {
     if (item.request) requests.push(item);
@@ -1795,13 +2214,27 @@ test('Competition frontend Swagger and Postman contracts expose round definition
   assert.equal(adminList.request.method, 'GET');
   assert.equal(adminList.request.url.raw, '{{BASE_URL}}/api/admin/competitions?page=1&limit=10');
 
+  const publicList = requests.find(({ name }) => name === 'List Active Competitions');
+  const scopeQuery = publicList.request.url.query.find(({ key }) => key === 'scope');
+  for (const scope of COMPETITION_SCOPES) assert.match(scopeQuery.description, new RegExp(scope));
+
   const createCompetition = requests.find(({ name }) => name === 'Admin Create Competition');
+  for (const scope of COMPETITION_SCOPES) {
+    assert.match(createCompetition.request.description, new RegExp(scope));
+  }
   const createBody = JSON.parse(createCompetition.request.body.raw);
   assert.deepEqual(createBody.rounds.map(({ name, order }) => ({ name, order })), [
     { name: 'Qualifier', order: 1 },
     { name: 'Semifinal', order: 2 },
     { name: 'Final', order: 3 },
   ]);
+  assert.equal(createBody.rounds.every(({ eventStartsDate, eventEndDate }) => (
+    typeof eventStartsDate === 'string'
+    && typeof eventEndDate === 'string'
+    && new Date(eventStartsDate) < new Date(eventEndDate)
+    && new Date(eventStartsDate) >= new Date(createBody.eventStartDate)
+    && new Date(eventEndDate) <= new Date(createBody.eventEndDate)
+  )), true);
   for (const action of ['Pass', 'Fail']) {
     const request = requests.find(({ name }) => name === `Admin ${action} Competition Registration Round`);
     assert.deepEqual(JSON.parse(request.request.body.raw), { roundId: '{{round_id}}' });

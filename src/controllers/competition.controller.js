@@ -85,7 +85,7 @@ exports.getCompetitions = asyncHandler(async (req, res) => {
 
   const [competitions, total] = await Promise.all([
     Competition.find(filter)
-      .sort({ eventStartDate: 1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)
       .lean(),
@@ -201,29 +201,34 @@ exports.updateCompetition = asyncHandler(async (req, res) => {
         ],
       }).session(session);
 
+      const hasSameLogicalRoundPositions = existingRounds.length === newRounds.length
+        && existingRounds.every((oldRound, index) => (
+          Number(newRounds[index]?.order) === Number(oldRound.order)
+        ));
+      const hasExplicitIdentityMismatch = hasSameLogicalRoundPositions
+        && existingRounds.some((oldRound, index) => (
+          newRounds[index]?._id
+          && String(newRounds[index]._id) !== String(oldRound._id)
+        ));
+
       if (hasProgress) {
         // Structural check: lengths, positions, IDs, and orders must remain stable.
         // Restore omitted IDs so a safe rename does not regenerate embedded identity.
-        let isStructuralMismatch = existingRounds.length !== newRounds.length;
-        if (!isStructuralMismatch) {
-          for (let i = 0; i < existingRounds.length; i++) {
-            const oldR = existingRounds[i];
-            const newR = newRounds[i];
-            if (newR._id && String(newR._id) !== String(oldR._id)) {
-              isStructuralMismatch = true;
-              break;
-            }
-            if (Number(newR.order) !== Number(oldR.order)) {
-              isStructuralMismatch = true;
-              break;
-            }
-          }
-        }
+        const isStructuralMismatch = !hasSameLogicalRoundPositions || hasExplicitIdentityMismatch;
 
         if (isStructuralMismatch) {
           throw new ApiError(409, 'Cannot modify round structure after participant progression has started.');
         }
 
+        data.rounds = newRounds.map((round, index) => ({
+          ...round,
+          _id: existingRounds[index]._id,
+        }));
+      } else if (hasSameLogicalRoundPositions && !hasExplicitIdentityMismatch) {
+        // Name/date edits are non-structural. Preserve identity even before
+        // progression when clients omit embedded IDs. Explicit replacement IDs,
+        // additions, removals, and reordering retain their existing pre-progress
+        // structural behavior.
         data.rounds = newRounds.map((round, index) => ({
           ...round,
           _id: existingRounds[index]._id,

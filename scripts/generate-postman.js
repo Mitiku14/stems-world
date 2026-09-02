@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { COMPETITION_SCOPES } = require('../src/constants');
+
+const COMPETITION_SCOPE_DESCRIPTION = `Allowed Competition scope values: ${COMPETITION_SCOPES.join(', ')}. The institutional and local values are invalid.`;
 
 const collection = {
   info: {
@@ -605,7 +608,7 @@ const enrollmentsFolder = {
 // 5. Competitions
 const competitionsFolder = {
   name: '5. Competitions',
-  description: 'Public competition endpoints & admin lifecycle/review',
+  description: `Public competition endpoints & admin lifecycle/review. ${COMPETITION_SCOPE_DESCRIPTION}`,
   item: [
     {
       name: 'List Active Competitions',
@@ -619,7 +622,7 @@ const competitionsFolder = {
           query: [
             { key: 'category', value: 'steam_innovation' },
             { key: 'type', value: 'team' },
-            { key: 'scope', value: 'national' },
+            { key: 'scope', value: 'national', description: COMPETITION_SCOPE_DESCRIPTION },
             { key: 'page', value: '1' },
             { key: 'limit', value: '10' }
           ]
@@ -680,6 +683,7 @@ const competitionsFolder = {
       event: [makeTest(201)],
       auth: bearerAuth('admin_token'),
       request: {
+        description: COMPETITION_SCOPE_DESCRIPTION,
         method: 'POST',
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
@@ -697,9 +701,24 @@ const competitionsFolder = {
             location: 'Main Science Hub, Addis Ababa',
             requirements: ['High school students grade 9-12', 'Basic Python programming', 'Laptop'],
             rounds: [
-              { name: 'Qualifier', order: 1 },
-              { name: 'Semifinal', order: 2 },
-              { name: 'Final', order: 3 }
+              {
+                name: 'Qualifier',
+                order: 1,
+                eventStartsDate: '2026-10-15T09:00:00.000Z',
+                eventEndDate: '2026-10-15T12:00:00.000Z'
+              },
+              {
+                name: 'Semifinal',
+                order: 2,
+                eventStartsDate: '2026-10-16T09:00:00.000Z',
+                eventEndDate: '2026-10-16T12:00:00.000Z'
+              },
+              {
+                name: 'Final',
+                order: 3,
+                eventStartsDate: '2026-10-16T14:00:00.000Z',
+                eventEndDate: '2026-10-16T18:00:00.000Z'
+              }
             ],
             maxRegistrations: 100,
             status: 'published',

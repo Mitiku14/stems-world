@@ -53,6 +53,8 @@ const flattenCompetition = (competition) => {
       _id: round._id,
       name: round.name,
       order: round.order,
+      eventStartsDate: round.eventStartsDate,
+      eventEndDate: round.eventEndDate,
     })),
   };
 };

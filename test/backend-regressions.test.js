@@ -448,7 +448,7 @@ test('AUD-M04: search query validators enforce scalar string type and max length
 });
 
 test('competition creation rejects invalid chronological date order', async () => {
-  const base = { title: 'Test', category: 'steam_innovation', type: 'individual', scope: 'local' };
+  const base = { title: 'Test', category: 'steam_innovation', type: 'individual', scope: 'school_level' };
   const cases = [
     { registrationOpenDate: '2026-02-02', registrationCloseDate: '2026-02-01' },
     { eventStartDate: '2026-03-02', eventEndDate: '2026-03-01' },

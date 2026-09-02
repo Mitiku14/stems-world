@@ -337,7 +337,67 @@ All fields are optional. Only provided fields are updated. Partial category/subc
 
 ---
 
-## 5. Summary of Other API Endpoints
+## 5. Competition API Contract
+
+### 5.1 Scope values and listing order
+
+The `scope` field and the public `scope` query filter accept exactly: `school_level`, `regional`, `national`, `continental`, and `international`. The `institutional` and `local` values are invalid and require manual review if found in legacy data. `GET /api/competitions` and `GET /api/admin/competitions` return newest-created competitions first (`createdAt` descending).
+
+### 5.2 Round event dates
+
+A Competition may remain roundless. When `rounds` is non-empty, every round requires the following fields in addition to its stable `_id`, `name`, and contiguous `order`:
+
+| Field | Type | Required | Constraints |
+| :--- | :--- | :--- | :--- |
+| `eventStartsDate` | ISO 8601 date string | **Yes** | Must be strictly earlier than that round's `eventEndDate`. If the Competition has `eventStartDate`, the round cannot start before it. |
+| `eventEndDate` | ISO 8601 date string | **Yes** | Must be strictly later than that round's `eventStartsDate`. If the Competition has `eventEndDate`, the round cannot end after it. |
+
+```json
+{
+  "rounds": [
+    {
+      "name": "Qualifier",
+      "order": 1,
+      "eventStartsDate": "2026-10-15T09:00:00.000Z",
+      "eventEndDate": "2026-10-15T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+The API does not require rounds to be non-overlapping or chronologically ordered by their dates. Round progression continues to use `order` and stable round `_id` values. Non-structural name/date edits preserve stored round IDs even when the update omits `_id`; legitimate pre-progression additions, removals, and intentional structural replacements retain their existing behavior. Partial Competition updates validate the final merged document, including unchanged stored rounds against any changed overall event boundary.
+
+Round event dates are returned anywhere Competition rounds are returned, including public/admin Competition reads and student/admin Competition-registration responses.
+
+### 5.3 Competition endpoints
+
+- `GET /api/competitions` - Public active published/completed list; supports `category`, `type`, `scope`, `page`, and `limit`.
+- `GET /api/competitions/:id` - Public Competition details.
+- `POST /api/competitions` - Admin create; validates the complete Competition and round schedule.
+- `PUT /api/competitions/:id` - Admin partial update; validates the final merged state.
+- `GET /api/admin/competitions` - Admin list including drafts and inactive records.
+- `GET /api/competitions/registrations/my` - Student registration/progression list with Competition round dates.
+- `GET /api/admin/competition-registrations` - Admin registration list with Competition round dates.
+
+### 5.4 Legacy metadata audit and deployment gate
+
+The strict Competition scope and round-date schema must not be deployed over unreviewed legacy data. Run `npm run audit:competition-metadata` to produce a raw, read-only report of retired/unknown scopes, missing or invalid round dates, strict chronology failures, and overall event-boundary violations. The tool is audit-only: it performs no writes or index operations, rejects `--apply`/`--write`, and prints both Competition IDs and embedded round IDs for review.
+
+Deployment order is mandatory:
+
+1. Run the read-only legacy audit.
+2. Classify every legacy `local`, missing, or unknown scope using approved business input.
+3. Provide valid dates for every legacy round.
+4. Preserve Competition IDs, embedded round IDs, round order, and progression references in a separately reviewed migration.
+5. Apply that reviewed migration before the strict application release.
+6. Verify the audit reports zero invalid records.
+7. Deploy the strict Competition schema and validators.
+
+The audit tool does not guess scope mappings or missing dates and does not make Phase A immediately deployable.
+
+---
+
+## 6. Summary of Other API Endpoints
 
 ### Auth Endpoints (`/api/auth`)
 - `POST /api/auth/register` - Student registration (body: `username`, `name`, `email`, `password`, `phone`)
@@ -362,7 +422,7 @@ All fields are optional. Only provided fields are updated. Partial category/subc
 
 ---
 
-## 6. Seed Data & Scripts
+## 7. Seed Data & Scripts
 
 - **Seed Courses**:
   ```bash
