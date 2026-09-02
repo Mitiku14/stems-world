@@ -2543,3 +2543,162 @@ test('Swagger and canonical Postman artifacts document optional CompetitionRegis
 async function validationStatus(chains, req) {
   return (await validate(chains, req)).isEmpty() ? 200 : 422;
 }
+
+test('Phase D Extension: Competition round shortDescription and requirements validation and persistence', async () => {
+  const compData = {
+    title: 'Round Info Competition ' + Date.now(),
+    category: 'steam_innovation',
+    type: 'individual',
+    scope: 'national',
+    registrationOpenDate: new Date('2026-08-01'),
+    registrationCloseDate: new Date('2026-09-01'),
+    eventStartDate: new Date('2026-10-01'),
+    eventEndDate: new Date('2026-10-31'),
+    rounds: [
+      {
+        name: 'Round 1',
+        order: 1,
+        eventStartsDate: new Date('2026-10-02'),
+        eventEndDate: new Date('2026-10-05'),
+        shortDescription: '   Initial project presentation.   ',
+        requirements: '   Submit project summary and attend the presentation.   ',
+      },
+      {
+        name: 'Round 2',
+        order: 2,
+        eventStartsDate: new Date('2026-10-10'),
+        eventEndDate: new Date('2026-10-15'),
+        shortDescription: 'Final coding round.',
+        requirements: 'Deploy live application.',
+      },
+    ],
+  };
+
+  const competition = new Competition(compData);
+  await competition.validate();
+  assert.equal(competition.rounds[0].shortDescription, 'Initial project presentation.');
+  assert.equal(competition.rounds[0].requirements, 'Submit project summary and attend the presentation.');
+  assert.equal(competition.rounds[1].shortDescription, 'Final coding round.');
+  assert.equal(competition.rounds[1].requirements, 'Deploy live application.');
+
+  const jsonObj = competition.toJSON();
+  assert.equal(jsonObj.rounds[0].shortDescription, 'Initial project presentation.');
+  assert.equal(jsonObj.rounds[0].requirements, 'Submit project summary and attend the presentation.');
+
+  const reqInvalidDesc = {
+    body: {
+      ...compData,
+      title: 'Invalid Short Description',
+      rounds: [
+        {
+          name: 'Round 1',
+          order: 1,
+          eventStartsDate: '2026-10-02T00:00:00.000Z',
+          eventEndDate: '2026-10-05T00:00:00.000Z',
+          shortDescription: 12345,
+        },
+      ],
+    },
+  };
+  const statusInvalidDesc = await validationStatus(competitionValidator.createCompetitionRules, reqInvalidDesc);
+  assert.equal(statusInvalidDesc, 422);
+
+  const reqInvalidReq = {
+    body: {
+      ...compData,
+      title: 'Invalid Requirements',
+      rounds: [
+        {
+          name: 'Round 1',
+          order: 1,
+          eventStartsDate: '2026-10-02T00:00:00.000Z',
+          eventEndDate: '2026-10-05T00:00:00.000Z',
+          requirements: true,
+        },
+      ],
+    },
+  };
+  const statusInvalidReq = await validationStatus(competitionValidator.createCompetitionRules, reqInvalidReq);
+  assert.equal(statusInvalidReq, 422);
+
+  const reqInvalidDates = {
+    body: {
+      ...compData,
+      title: 'Invalid Round Dates',
+      rounds: [
+        {
+          name: 'Round 1',
+          order: 1,
+          eventStartsDate: '2026-10-05T00:00:00.000Z',
+          eventEndDate: '2026-10-02T00:00:00.000Z',
+        },
+      ],
+    },
+  };
+  const statusInvalidDates = await validationStatus(competitionValidator.createCompetitionRules, reqInvalidDates);
+  assert.equal(statusInvalidDates, 422);
+
+  const reqNonContiguous = {
+    body: {
+      ...compData,
+      title: 'Non Contiguous Orders',
+      rounds: [
+        {
+          name: 'Round 1',
+          order: 1,
+          eventStartsDate: '2026-10-02T00:00:00.000Z',
+          eventEndDate: '2026-10-05T00:00:00.000Z',
+        },
+        {
+          name: 'Round 3',
+          order: 3,
+          eventStartsDate: '2026-10-06T00:00:00.000Z',
+          eventEndDate: '2026-10-10T00:00:00.000Z',
+        },
+      ],
+    },
+  };
+  const statusNonContiguous = await validationStatus(competitionValidator.createCompetitionRules, reqNonContiguous);
+  assert.equal(statusNonContiguous, 422);
+
+  const r1Id = new mongoose.Types.ObjectId();
+  const reg = new CompetitionRegistration({
+    competition: new mongoose.Types.ObjectId(),
+    fullName: 'Progression Test Student',
+    email: 'progression@example.com',
+    studentProfile: new mongoose.Types.ObjectId(),
+    currentRound: r1Id,
+    roundProgress: [{ round: r1Id, status: 'passed' }],
+  });
+  assert.equal(String(reg.currentRound), String(r1Id));
+  assert.equal(reg.roundProgress[0].status, 'passed');
+
+  const oldComp = new Competition({
+    title: 'Old Competition Legacy ' + Date.now(),
+    category: 'steam_innovation',
+    type: 'individual',
+    scope: 'national',
+    registrationOpenDate: new Date('2026-08-01'),
+    registrationCloseDate: new Date('2026-09-01'),
+    eventStartDate: new Date('2026-10-01'),
+    eventEndDate: new Date('2026-10-31'),
+    rounds: [
+      {
+        name: 'Legacy Round',
+        order: 1,
+        eventStartsDate: new Date('2026-10-02'),
+        eventEndDate: new Date('2026-10-05'),
+      },
+    ],
+  });
+  await oldComp.validate();
+  assert.equal(oldComp.rounds[0].shortDescription, null);
+  assert.equal(oldComp.rounds[0].requirements, null);
+
+  assert.notEqual(competition.rounds[0].shortDescription, competition.rounds[1].shortDescription);
+  assert.notEqual(competition.rounds[0].requirements, competition.rounds[1].requirements);
+
+  const roundDefSchema = swaggerSpec.components.schemas.RoundDefinition;
+  assert.equal(roundDefSchema.properties.shortDescription.type, 'string');
+  assert.equal(roundDefSchema.properties.requirements.type, 'string');
+});

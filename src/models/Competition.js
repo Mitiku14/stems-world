@@ -33,6 +33,18 @@ const roundSchema = new mongoose.Schema(
         message: 'Round event start date must be earlier than round event end date',
       },
     },
+    shortDescription: {
+      type: String,
+      trim: true,
+      default: null,
+      maxlength: [500, 'Round short description cannot exceed 500 characters'],
+    },
+    requirements: {
+      type: String,
+      trim: true,
+      default: null,
+      maxlength: [1000, 'Round requirements cannot exceed 1000 characters'],
+    },
   },
   { _id: true }
 );

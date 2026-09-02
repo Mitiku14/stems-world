@@ -482,6 +482,20 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
               example: '2026-10-15T12:00:00.000Z',
               description: 'Required. Must be later than eventStartsDate and not later than the Competition eventEndDate when present.',
             },
+            shortDescription: {
+              type: 'string',
+              maxLength: 500,
+              nullable: true,
+              example: 'Initial project presentation.',
+              description: 'Optional short description of what happens in this round.',
+            },
+            requirements: {
+              type: 'string',
+              maxLength: 1000,
+              nullable: true,
+              example: 'Submit project summary and attend the presentation.',
+              description: 'Optional summary of participant requirements for this round.',
+            },
           },
         },
 

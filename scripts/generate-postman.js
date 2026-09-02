@@ -706,19 +706,25 @@ const competitionsFolder = {
                 name: 'Qualifier',
                 order: 1,
                 eventStartsDate: '2026-10-15T09:00:00.000Z',
-                eventEndDate: '2026-10-15T12:00:00.000Z'
+                eventEndDate: '2026-10-15T12:00:00.000Z',
+                shortDescription: 'Initial online coding challenge.',
+                requirements: 'Complete all 3 algorithmic problems within 3 hours.'
               },
               {
                 name: 'Semifinal',
                 order: 2,
                 eventStartsDate: '2026-10-16T09:00:00.000Z',
-                eventEndDate: '2026-10-16T12:00:00.000Z'
+                eventEndDate: '2026-10-16T12:00:00.000Z',
+                shortDescription: 'AI model training and validation round.',
+                requirements: 'Submit trained model weights and validation report.'
               },
               {
                 name: 'Final',
                 order: 3,
                 eventStartsDate: '2026-10-16T14:00:00.000Z',
-                eventEndDate: '2026-10-16T18:00:00.000Z'
+                eventEndDate: '2026-10-16T18:00:00.000Z',
+                shortDescription: 'Live project presentation to judges.',
+                requirements: 'Present 10-minute slide deck and live demonstration.'
               }
             ],
             maxRegistrations: 100,

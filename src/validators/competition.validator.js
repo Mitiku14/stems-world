@@ -105,6 +105,24 @@ const competitionRoundsRule = () =>
           throw new Error(`Round ${index + 1} order must be an integer of at least 1`);
         }
         orders.push(order);
+
+        if (round.shortDescription !== undefined && round.shortDescription !== null) {
+          if (typeof round.shortDescription !== 'string') {
+            throw new Error(`Round ${index + 1} shortDescription must be a string`);
+          }
+          if (round.shortDescription.trim().length > 500) {
+            throw new Error(`Round ${index + 1} shortDescription cannot exceed 500 characters`);
+          }
+        }
+
+        if (round.requirements !== undefined && round.requirements !== null) {
+          if (typeof round.requirements !== 'string') {
+            throw new Error(`Round ${index + 1} requirements must be a string`);
+          }
+          if (round.requirements.trim().length > 1000) {
+            throw new Error(`Round ${index + 1} requirements cannot exceed 1000 characters`);
+          }
+        }
       });
 
       validateRoundSchedule(rounds);
