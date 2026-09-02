@@ -151,6 +151,9 @@ const optionalAuth = (req, res, next) => {
  *             type: object
  *             required: [fullName, email]
  *             properties:
+ *               studentProfileId:
+ *                 type: string
+ *                 description: The StudentProfile._id of the child being registered. Authenticated frontend obtains this from GET /api/students.
  *               fullName: { type: string }
  *               email: { type: string }
  *               phone: { type: string }

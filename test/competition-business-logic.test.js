@@ -2533,7 +2533,7 @@ test('Swagger and canonical Postman artifacts document optional CompetitionRegis
     collect(item.item);
   });
   collect(collection.item);
-  const registrationRequest = requests.find(({ name }) => name === 'Register for Competition');
+  const registrationRequest = requests.find(({ name }) => name === 'Register for Competition (Authenticated)' || name === 'Register for Competition');
   assert.equal(
     JSON.parse(registrationRequest.request.body.raw).academicFile,
     'https://example.com/documents/academic-record.pdf'

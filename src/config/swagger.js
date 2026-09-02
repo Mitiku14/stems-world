@@ -395,13 +395,14 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
 
         StudentProfileSummary: {
           type: 'object',
-          required: ['_id', 'fullName', 'displayLabel', 'slot', 'profileNumber'],
+          required: ['_id', 'fullName', 'displayLabel', 'profileNumber'],
           properties: {
             _id: { type: 'string' },
             fullName: { type: 'string' },
             displayLabel: { type: 'string' },
-            slot: { type: 'integer', minimum: 1, maximum: 5 },
             profileNumber: { type: 'integer', minimum: 1, maximum: 5 },
+            grade: { type: 'string', nullable: true },
+            school: { type: 'string', nullable: true },
           },
         },
 
@@ -575,6 +576,11 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
                   items: { $ref: '#/components/schemas/RoundDefinition' },
                 },
               },
+            },
+            studentProfile: {
+              $ref: '#/components/schemas/StudentProfileSummary',
+              description: 'Populated StudentProfile summary (if authenticated).',
+              nullable: true,
             },
             studentName: { type: 'string', example: 'Jane Doe' },
             email: { type: 'string', example: 'jane@example.com' },

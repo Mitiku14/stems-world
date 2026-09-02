@@ -560,6 +560,91 @@ describe('Phase C: admin flattenRegistration distinguishes participant from acco
 });
 
 // =============================================================================
+// ADMIN LIST POPULATION AND SERIALIZATION
+// =============================================================================
+
+describe('Phase C: Admin List Population Regression Test', () => {
+  const compRegCtrl = require('../src/controllers/competitionRegistration.controller');
+
+  it('getAllRegistrations populates studentProfile for admin response', async () => {
+    let populateCalled = false;
+    const origFind = CompetitionRegistration.find;
+    CompetitionRegistration.find = (filter) => {
+      const query = {
+        populate(field) {
+          if (field === 'studentProfile') populateCalled = true;
+          return query;
+        },
+        sort() { return query; },
+        skip() { return query; },
+        limit() { return query; },
+        lean: async () => [{
+          _id: oid(),
+          competition: { _id: compId, title: 'Test', rounds: [] },
+          studentProfile: profileA1, // Populated profile
+          fullName: 'Abel',
+          status: 'pending'
+        }]
+      };
+      return query;
+    };
+    
+    const origCount = CompetitionRegistration.countDocuments;
+    CompetitionRegistration.countDocuments = async () => 1;
+
+    const res = { json: (data) => data };
+    
+    try {
+      const response = await compRegCtrl.getAllRegistrations({ query: {} }, res, () => {});
+      assert.ok(populateCalled, '.populate("studentProfile") must be chained in the admin list handler query');
+      
+      const reg = response.data.registrations[0];
+      assert.ok(reg.studentProfile, 'studentProfile summary must be exposed in admin list response');
+      assert.equal(reg.studentProfile.fullName, 'Abel Bekele Tesfaye');
+    } finally {
+      CompetitionRegistration.find = origFind;
+      CompetitionRegistration.countDocuments = origCount;
+    }
+  });
+
+  it('legacy registration without studentProfile serializes correctly in admin list', async () => {
+    const origFind = CompetitionRegistration.find;
+    CompetitionRegistration.find = (filter) => {
+      const query = {
+        populate: () => query,
+        sort: () => query,
+        skip: () => query,
+        limit: () => query,
+        lean: async () => [{
+          _id: oid(),
+          competition: { _id: compId, title: 'Test', rounds: [] },
+          student: { _id: parentA, name: 'Legacy Parent', email: 'legacy@parent.com' },
+          fullName: 'Legacy Name',
+          status: 'pending'
+        }]
+      };
+      return query;
+    };
+    
+    const origCount = CompetitionRegistration.countDocuments;
+    CompetitionRegistration.countDocuments = async () => 1;
+
+    const res = { json: (data) => data };
+    
+    try {
+      const response = await compRegCtrl.getAllRegistrations({ query: {} }, res, () => {});
+      const reg = response.data.registrations[0];
+      
+      assert.equal(reg.studentProfile, null, 'legacy records expose null studentProfile');
+      assert.equal(reg.studentName, 'Legacy Parent', 'legacy records fall back to student name correctly');
+    } finally {
+      CompetitionRegistration.find = origFind;
+      CompetitionRegistration.countDocuments = origCount;
+    }
+  });
+});
+
+// =============================================================================
 // REMEDIATION VERIFICATION TESTS
 // =============================================================================
 

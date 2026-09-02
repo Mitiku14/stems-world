@@ -424,6 +424,7 @@ exports.getAllRegistrations = asyncHandler(async (req, res) => {
     CompetitionRegistration.find(filter)
       .populate('student', 'name email')
       .populate('competition', 'title category type rounds')
+      .populate('studentProfile')
       .sort({ createdAt: -1 })
       .skip((p - 1) * l)
       .limit(l)

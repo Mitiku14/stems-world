@@ -656,14 +656,16 @@ const competitionsFolder = {
       }
     },
     {
-      name: 'Register for Competition',
+      name: 'Register for Competition (Authenticated)',
       event: [makeTest(201)],
+      auth: bearerAuth('student_token'),
       request: {
         method: 'POST',
         header: [{ key: 'Content-Type', value: 'application/json' }],
         body: {
           mode: 'raw',
           raw: JSON.stringify({
+            studentProfileId: '{{student_profile_id}}',
             fullName: 'Postman Participant',
             email: 'postman_participant@example.com',
             phone: '+1234567890',
@@ -816,7 +818,12 @@ const competitionsFolder = {
       auth: bearerAuth('student_token'),
       request: {
         method: 'GET',
-        url: { raw: '{{BASE_URL}}/api/competitions/registrations/my', host: ['{{BASE_URL}}'], path: ['api', 'competitions', 'registrations', 'my'] }
+        url: { 
+          raw: '{{BASE_URL}}/api/competitions/registrations/my?studentProfileId={{student_profile_id}}', 
+          host: ['{{BASE_URL}}'], 
+          path: ['api', 'competitions', 'registrations', 'my'],
+          query: [{ key: 'studentProfileId', value: '{{student_profile_id}}' }]
+        }
       }
     },
     {
@@ -1273,7 +1280,24 @@ const studentProfilesFolder = {
   item: [
     {
       name: 'Create Student',
-      event: [makeTest(201)],
+      event: [{
+        listen: 'test',
+        script: {
+          exec: [
+            'pm.test("Status code is 201", function () { pm.response.to.have.status(201); });',
+            'pm.test("Response is valid JSON wrapper", function () {',
+            '    var jsonData = pm.response.json();',
+            '    pm.expect(jsonData).to.have.property("success");',
+            '    pm.expect(jsonData).to.have.property("message");',
+            '});',
+            'pm.test("Profile ID securely captured", function () {',
+            '    var res = pm.response.json();',
+            '    if (res.data && res.data.student) pm.environment.set("student_profile_id", res.data.student._id);',
+            '});'
+          ],
+          type: 'text/javascript'
+        }
+      }],
       auth: bearerAuth('student_token'),
       request: {
         method: 'POST',
@@ -1293,7 +1317,26 @@ const studentProfilesFolder = {
     },
     {
       name: 'List My Students',
-      event: [makeTest(200)],
+      event: [{
+        listen: 'test',
+        script: {
+          exec: [
+            'pm.test("Status code is 200", function () { pm.response.to.have.status(200); });',
+            'pm.test("Response is valid JSON wrapper", function () {',
+            '    var jsonData = pm.response.json();',
+            '    pm.expect(jsonData).to.have.property("success");',
+            '    pm.expect(jsonData).to.have.property("message");',
+            '});',
+            'pm.test("Profile ID securely captured from list", function () {',
+            '    var res = pm.response.json();',
+            '    if (res.data && res.data.students && res.data.students.length > 0) {',
+            '        pm.environment.set("student_profile_id", res.data.students[0]._id);',
+            '    }',
+            '});'
+          ],
+          type: 'text/javascript'
+        }
+      }],
       auth: bearerAuth('student_token'),
       request: {
         method: 'GET',
@@ -1367,6 +1410,7 @@ const environment = {
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', enabled: true },
     { key: 'certificate_number', value: 'CERT-2026-A1B2C3D4', enabled: true },
     { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', enabled: true },
+    { key: 'student_profile_id', value: '64a1b2c3d4e5f6789012abdd', enabled: true },
     { key: 'phone_otp', value: '123456', enabled: true }
   ]
 };
