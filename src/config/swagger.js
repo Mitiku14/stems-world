@@ -332,6 +332,95 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
           },
         },
 
+        // ── Homepage statistics ─────────────────────────────────────────────
+        HomepageStatisticsShowPlus: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'registeredStudents',
+            'totalCoursesGiven',
+            'annualLearningCapacity',
+            'competitionParticipants',
+          ],
+          properties: {
+            registeredStudents: { type: 'boolean', default: true },
+            totalCoursesGiven: { type: 'boolean', default: true },
+            annualLearningCapacity: { type: 'boolean', default: true },
+            competitionParticipants: { type: 'boolean', default: true },
+          },
+        },
+        HomepageStatisticDisplayValue: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['value', 'showPlus'],
+          properties: {
+            value: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+            showPlus: { type: 'boolean' },
+          },
+        },
+        HomepageStatisticsPublic: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'registeredStudents',
+            'totalCoursesGiven',
+            'annualLearningCapacity',
+            'competitionParticipants',
+          ],
+          properties: {
+            registeredStudents: { $ref: '#/components/schemas/HomepageStatisticDisplayValue' },
+            totalCoursesGiven: { $ref: '#/components/schemas/HomepageStatisticDisplayValue' },
+            annualLearningCapacity: { $ref: '#/components/schemas/HomepageStatisticDisplayValue' },
+            competitionParticipants: { $ref: '#/components/schemas/HomepageStatisticDisplayValue' },
+          },
+        },
+        HomepageStatisticsAdmin: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'configured',
+            'registeredStudents',
+            'totalCoursesGiven',
+            'annualLearningCapacity',
+            'competitionParticipants',
+            'showPlus',
+            'updatedBy',
+            'updatedAt',
+          ],
+          properties: {
+            configured: { type: 'boolean', example: true },
+            registeredStudents: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER, default: 1500, example: 1500 },
+            totalCoursesGiven: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER, default: 10, example: 10 },
+            annualLearningCapacity: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER, default: 3000, example: 3000 },
+            competitionParticipants: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER, default: 10, example: 10 },
+            showPlus: { $ref: '#/components/schemas/HomepageStatisticsShowPlus' },
+            updatedBy: { type: 'string', nullable: true },
+            updatedAt: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+        HomepageStatisticsPatch: {
+          type: 'object',
+          additionalProperties: false,
+          minProperties: 1,
+          properties: {
+            registeredStudents: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+            totalCoursesGiven: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+            annualLearningCapacity: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+            competitionParticipants: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+            showPlus: {
+              type: 'object',
+              additionalProperties: false,
+              minProperties: 1,
+              properties: {
+                registeredStudents: { type: 'boolean' },
+                totalCoursesGiven: { type: 'boolean' },
+                annualLearningCapacity: { type: 'boolean' },
+                competitionParticipants: { type: 'boolean' },
+              },
+            },
+          },
+        },
+
         // ── Site ─────────────────────────────────────────────────────────────
         Site: {
           type: 'object',
@@ -743,6 +832,8 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
       { name: 'Notifications',       description: 'In-app notification management for students' },
       { name: 'Certificates',        description: 'Student certificate retrieval and public verification' },
       { name: 'Admin — Dashboard',   description: 'Admin overview statistics and feedback' },
+      { name: 'Statistics',          description: 'Public PM-managed homepage statistics' },
+      { name: 'Admin — Statistics',  description: 'Admin homepage statistics configuration' },
       { name: 'Admin — Enrollments', description: 'Admin enrollment review (accept / reject)' },
       { name: 'Admin — Courses',     description: 'Admin course management' },
       { name: 'Admin — Students',    description: 'Admin student account management' },
@@ -771,6 +862,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     './src/routes/competition.routes.js',
     './src/routes/notification.routes.js',
     './src/routes/certificate.routes.js',
+    './src/routes/statistics.routes.js',
   ],
 };
 

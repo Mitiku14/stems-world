@@ -1112,6 +1112,33 @@ const adminCoreFolder = {
       }
     },
     {
+      name: 'Admin Get Homepage Statistics',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/admin/statistics', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'statistics'] }
+      }
+    },
+    {
+      name: 'Admin Update Homepage Statistics',
+      event: [makeTest(200)],
+      auth: bearerAuth('admin_token'),
+      request: {
+        method: 'PATCH',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({
+            registeredStudents: 1600,
+            annualLearningCapacity: 3500,
+            showPlus: { annualLearningCapacity: false }
+          }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/admin/statistics', host: ['{{BASE_URL}}'], path: ['api', 'admin', 'statistics'] }
+      }
+    },
+    {
       name: 'Admin Get Contact Feedback Submissions',
       event: [makeTest(200)],
       auth: bearerAuth('admin_token'),
@@ -1373,6 +1400,22 @@ const studentProfilesFolder = {
   ]
 };
 
+// 13. Homepage Statistics
+const homepageStatisticsFolder = {
+  name: '13. Homepage Statistics',
+  description: 'Public PM-managed homepage impact numbers',
+  item: [
+    {
+      name: 'Get Homepage Statistics',
+      event: [makeTest(200)],
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/statistics', host: ['{{BASE_URL}}'], path: ['api', 'statistics'] }
+      }
+    }
+  ]
+};
+
 collection.item = [
   authFolder,
   coursesFolder,
@@ -1385,7 +1428,8 @@ collection.item = [
   adminCoreFolder,
   csvExportsFolder,
   contactFolder,
-  studentProfilesFolder
+  studentProfilesFolder,
+  homepageStatisticsFolder
 ];
 
 const environment = {

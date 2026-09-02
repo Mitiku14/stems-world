@@ -13,6 +13,7 @@ const notificationController = require('../controllers/notification.controller')
 const certificateController = require('../controllers/certificate.controller');
 const resourceController   = require('../controllers/resource.controller');
 const courseSubcategoryController = require('../controllers/courseSubcategory.controller');
+const statisticsController = require('../controllers/statistics.controller');
 
 const adminValidator       = require('../validators/admin.validator');
 const enrollmentValidator  = require('../validators/enrollment.validator');
@@ -24,6 +25,7 @@ const resourceValidator    = require('../validators/resource.validator');
 const courseValidator      = require('../validators/course.validator');
 const courseSubcategoryValidator = require('../validators/courseSubcategory.validator');
 const contactValidator     = require('../validators/contact.validator');
+const statisticsValidator  = require('../validators/statistics.validator');
 const { validate }         = require('../middleware/validate.middleware');
 const { verifyToken }      = require('../middleware/auth.middleware');
 const { requireRole }      = require('../middleware/role.middleware');
@@ -94,6 +96,77 @@ const studentListQuery = [
  *         $ref: '#/components/responses/Forbidden'
  */
 router.get('/dashboard', adminController.getDashboard);
+
+// ── Homepage Statistics ────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/admin/statistics:
+ *   get:
+ *     summary: Get homepage statistics configuration
+ *     description: Returns the PM-managed configuration. Missing configuration is represented by approved defaults with configured=false; this endpoint never writes.
+ *     tags: [Admin — Statistics]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Homepage statistics configuration fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string }
+ *                 data: { $ref: '#/components/schemas/HomepageStatisticsAdmin' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ *   patch:
+ *     summary: Partially update homepage statistics
+ *     description: Updates only supplied numeric or nested showPlus fields. Omitted values remain unchanged. The first valid update atomically creates the singleton configuration.
+ *     tags: [Admin — Statistics]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/HomepageStatisticsPatch' }
+ *     responses:
+ *       200:
+ *         description: Homepage statistics updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required: [success, message, data]
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string }
+ *                 data: { $ref: '#/components/schemas/HomepageStatisticsAdmin' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
+ *       409:
+ *         $ref: '#/components/responses/Conflict'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get('/statistics', statisticsController.getAdminStatistics);
+router.patch(
+  '/statistics',
+  statisticsValidator.patchStatistics,
+  validate,
+  statisticsController.updateAdminStatistics
+);
 
 // ── Enrollment Management ──────────────────────────────────────────────────
 
