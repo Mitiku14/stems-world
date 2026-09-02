@@ -17,9 +17,9 @@ const verifyParam = [
 ];
 
 const issueBody = [
-  body('studentId')
+  body('studentProfileId')
     .custom((v) => mongoose.Types.ObjectId.isValid(v))
-    .withMessage('Invalid student ID'),
+    .withMessage('Invalid student profile ID'),
 
   body('type')
     .trim()
@@ -50,6 +50,13 @@ const issueBody = [
     .withMessage('Grade or rank cannot exceed 100 characters'),
 ];
 
+const myListQuery = [
+  query('studentProfileId')
+    .optional()
+    .custom((v) => !v || mongoose.Types.ObjectId.isValid(v))
+    .withMessage('Invalid student profile ID'),
+];
+
 const adminListQuery = [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
@@ -61,5 +68,6 @@ module.exports = {
   certificateIdParam,
   verifyParam,
   issueBody,
+  myListQuery,
   adminListQuery,
 };

@@ -3249,7 +3249,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{BASE_URL}}/api/certificates/my",
+              "raw": "{{BASE_URL}}/api/certificates/my?studentProfileId={{student_profile_id}}",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -3257,6 +3257,12 @@
                 "api",
                 "certificates",
                 "my"
+              ],
+              "query": [
+                {
+                  "key": "studentProfileId",
+                  "value": "{{student_profile_id}}"
+                }
               ]
             }
           }
@@ -3346,7 +3352,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"studentId\": \"{{student_id}}\",\n  \"type\": \"course_completion\",\n  \"title\": \"Certificate of Excellence in Python Programming\",\n  \"courseId\": \"{{course_id}}\",\n  \"gradeOrRank\": \"Distinction\"\n}"
+              "raw": "{\n  \"studentProfileId\": \"{{student_profile_id}}\",\n  \"type\": \"course_completion\",\n  \"title\": \"Certificate of Excellence in Python Programming\",\n  \"courseId\": \"{{course_id}}\",\n  \"gradeOrRank\": \"Distinction\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/admin/certificates",

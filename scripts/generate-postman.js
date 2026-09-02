@@ -1016,7 +1016,12 @@ const certificatesFolder = {
       auth: bearerAuth('student_token'),
       request: {
         method: 'GET',
-        url: { raw: '{{BASE_URL}}/api/certificates/my', host: ['{{BASE_URL}}'], path: ['api', 'certificates', 'my'] }
+        url: {
+          raw: '{{BASE_URL}}/api/certificates/my?studentProfileId={{student_profile_id}}',
+          host: ['{{BASE_URL}}'],
+          path: ['api', 'certificates', 'my'],
+          query: [{ key: 'studentProfileId', value: '{{student_profile_id}}' }]
+        }
       }
     },
     {
@@ -1038,7 +1043,7 @@ const certificatesFolder = {
         body: {
           mode: 'raw',
           raw: JSON.stringify({
-            studentId: '{{student_id}}',
+            studentProfileId: '{{student_profile_id}}',
             type: 'course_completion',
             title: 'Certificate of Excellence in Python Programming',
             courseId: '{{course_id}}',

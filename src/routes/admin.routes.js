@@ -1106,7 +1106,7 @@ router.get('/export/courses', exportController.exportCourses);
  * @swagger
  * /api/admin/certificates:
  *   post:
- *     summary: Issue a digital certificate to a student
+ *     summary: Issue a digital certificate to a student profile
  *     tags: [Admin — Certificates]
  *     security:
  *       - BearerAuth: []
@@ -1116,9 +1116,9 @@ router.get('/export/courses', exportController.exportCourses);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [studentId, type, title]
+ *             required: [studentProfileId, type, title]
  *             properties:
- *               studentId: { type: string }
+ *               studentProfileId: { type: string }
  *               type: { type: string, enum: [course_completion, competition_achievement, hackathon_winner, special_recognition] }
  *               title: { type: string, example: "Certificate of Completion - Python Programming" }
  *               courseId: { type: string }

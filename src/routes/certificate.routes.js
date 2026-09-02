@@ -30,17 +30,27 @@ router.get('/verify/:certificateNumber', certificateValidator.verifyParam, valid
  * @swagger
  * /api/certificates/my:
  *   get:
- *     summary: Get authenticated student's digital certificates
+ *     summary: Get authenticated parent's/student's digital certificates
  *     tags: [Certificates]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: studentProfileId
+ *         required: false
+ *         schema: { type: string }
+ *         description: Filter certificates to a specific owned StudentProfile
  *     responses:
  *       200:
  *         description: Certificates fetched successfully
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
  */
-router.get('/my', verifyToken, certificateController.getMyCertificates);
+router.get('/my', verifyToken, certificateValidator.myListQuery, validate, certificateController.getMyCertificates);
 
 /**
  * @swagger

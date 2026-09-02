@@ -2,11 +2,25 @@ const mongoose = require('mongoose');
 
 const certificateSchema = new mongoose.Schema(
   {
+    // Legacy student reference (User)
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      default: null,
       index: true,
+    },
+    // Phase D: parent-owned participant identity
+    studentProfile: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudentProfile',
+      default: null,
+      index: true,
+    },
+    // Name snapshot at time of certificate issuance
+    recipientNameSnapshot: {
+      type: String,
+      trim: true,
+      default: null,
     },
     certificateNumber: {
       type: String,
@@ -63,5 +77,6 @@ const certificateSchema = new mongoose.Schema(
 
 // Indexes
 certificateSchema.index({ student: 1, createdAt: -1 });
+certificateSchema.index({ studentProfile: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Certificate', certificateSchema);
