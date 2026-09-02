@@ -345,6 +345,113 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
           },
         },
 
+        // ── StudentProfile ───────────────────────────────────────────────────
+        StudentProfile: {
+          type: 'object',
+          description: 'A child/student record owned by the authenticated User. StudentProfile._id is authoritative; slot and profileNumber are parent-local presentation/capacity fields.',
+          required: ['_id', 'givenName', 'fatherName', 'grandfatherName', 'fullName', 'displayLabel', 'slot', 'profileNumber', 'isActive'],
+          properties: {
+            _id: { type: 'string', example: '64a1b2c3d4e5f6789012abdd' },
+            givenName: { type: 'string', example: 'Abel' },
+            fatherName: { type: 'string', example: 'Bekele' },
+            grandfatherName: { type: 'string', example: 'Tesfaye' },
+            fullName: { type: 'string', readOnly: true, example: 'Abel Bekele Tesfaye' },
+            displayLabel: { type: 'string', readOnly: true, example: 'Abel Bekele Tesfaye — Grade 7 — School A' },
+            slot: { type: 'integer', minimum: 1, maximum: 5, readOnly: true, description: 'Parent-local capacity and presentation slot; never use as authoritative identity.' },
+            profileNumber: { type: 'integer', minimum: 1, maximum: 5, readOnly: true, description: 'Display alias of slot.' },
+            grade: { type: 'string', nullable: true, example: 'Grade 7' },
+            school: { type: 'string', nullable: true, example: 'School A' },
+            isActive: { type: 'boolean', example: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        StudentProfileCreateInput: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['givenName', 'fatherName', 'grandfatherName'],
+          properties: {
+            givenName: { type: 'string', example: 'Mary Anne' },
+            fatherName: { type: 'string', example: 'Abd El-Rahman' },
+            grandfatherName: { type: 'string', example: "O'Connor" },
+            grade: { type: 'string', nullable: true, example: 'Grade 7' },
+            school: { type: 'string', nullable: true, example: 'School A' },
+          },
+        },
+
+        StudentProfileUpdateInput: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            givenName: { type: 'string', example: 'Mary Anne' },
+            fatherName: { type: 'string', example: 'Abd El-Rahman' },
+            grandfatherName: { type: 'string', example: "O'Connor" },
+            grade: { type: 'string', nullable: true, example: 'Grade 8' },
+            school: { type: 'string', nullable: true, example: 'School A' },
+            isActive: { type: 'boolean', example: true },
+          },
+        },
+
+        StudentProfileSummary: {
+          type: 'object',
+          required: ['_id', 'fullName', 'displayLabel', 'slot', 'profileNumber'],
+          properties: {
+            _id: { type: 'string' },
+            fullName: { type: 'string' },
+            displayLabel: { type: 'string' },
+            slot: { type: 'integer', minimum: 1, maximum: 5 },
+            profileNumber: { type: 'integer', minimum: 1, maximum: 5 },
+          },
+        },
+
+        StudentProfilePossibleDuplicate: {
+          type: 'object',
+          description: 'Non-blocking, same-parent-only warning. Matching names remain allowed and StudentProfile._id remains authoritative.',
+          required: ['matched', 'profiles'],
+          properties: {
+            matched: { type: 'boolean', example: true },
+            profiles: {
+              type: 'array',
+              maxItems: 4,
+              items: { $ref: '#/components/schemas/StudentProfileSummary' },
+            },
+          },
+        },
+
+        StudentProfileMutationResponse: {
+          type: 'object',
+          required: ['success', 'message', 'data'],
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'Student profile created successfully.' },
+            data: {
+              type: 'object',
+              required: ['student', 'possibleDuplicate'],
+              properties: {
+                student: { $ref: '#/components/schemas/StudentProfile' },
+                possibleDuplicate: { $ref: '#/components/schemas/StudentProfilePossibleDuplicate' },
+              },
+            },
+          },
+        },
+
+        StudentProfileDetailResponse: {
+          type: 'object',
+          required: ['success', 'message', 'data'],
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'Student profile fetched successfully.' },
+            data: {
+              type: 'object',
+              required: ['student'],
+              properties: {
+                student: { $ref: '#/components/schemas/StudentProfile' },
+              },
+            },
+          },
+        },
+
         // ── Competition ──────────────────────────────────────────────────────
         CompetitionScope: {
           type: 'string',
@@ -624,6 +731,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
       { name: 'Admin — Certificates', description: 'Admin certificate issuance and revocation' },
       { name: 'Admin — Resources',   description: 'Admin course resource management' },
       { name: 'Sites',                description: 'Physical training locations' },
+      { name: 'Student Profiles',     description: 'Authenticated parent-owned student profiles, limited to five retained slots per User' },
       { name: 'Admin — Sites',        description: 'Admin site/location management' },
       { name: 'Competitions',         description: 'Public competition endpoints' },
       { name: 'Admin — Competitions', description: 'Admin competition management and registration review' },
@@ -639,6 +747,7 @@ Obtain a token by logging in via \`POST /api/auth/login\` or \`POST /api/auth/go
     './src/routes/admin.routes.js',
     './src/routes/contact.routes.js',
     './src/routes/site.routes.js',
+    './src/routes/studentProfile.routes.js',
     './src/routes/competition.routes.js',
     './src/routes/notification.routes.js',
     './src/routes/certificate.routes.js',

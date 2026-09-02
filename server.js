@@ -24,6 +24,7 @@ const siteRoutes       = require('./src/routes/site.routes');
 const competitionRoutes = require('./src/routes/competition.routes');
 const notificationRoutes = require('./src/routes/notification.routes');
 const certificateRoutes  = require('./src/routes/certificate.routes');
+const studentProfileRoutes = require('./src/routes/studentProfile.routes');
 
 const app = express();
 
@@ -118,6 +119,7 @@ app.use('/api/sites',       siteRoutes);
 app.use('/api/competitions', competitionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/certificates',  certificateRoutes);
+app.use('/api/students',      studentProfileRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: 'Route not found.' });

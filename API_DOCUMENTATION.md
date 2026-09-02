@@ -397,7 +397,36 @@ The audit tool does not guess scope mappings or missing dates and does not make 
 
 ---
 
-## 6. Summary of Other API Endpoints
+## 6. StudentProfile Foundation
+
+StudentProfiles are child/student records owned by the authenticated User. All StudentProfile endpoints require a bearer token, and ownership is always resolved through `req.user._id` and `StudentProfile.parentUser`. A parent can list, read, and update only their own profiles.
+
+### 6.1 Identity, names, and display
+
+- `StudentProfile._id` is the authoritative identity used by detail and mutation endpoints.
+- `slot` and its response alias `profileNumber` are parent-local presentation and capacity fields, not identity.
+- Each profile requires `givenName`, `fatherName`, and `grandfatherName`. Components may contain spaces, Unicode characters, apostrophes, and hyphens.
+- Name components are normalized with Unicode NFKC, surrounding whitespace removal, and internal whitespace collapse while preserving human-facing casing.
+- `fullName` is derived as `givenName + fatherName + grandfatherName`.
+- `displayLabel` adds `grade` and then `school` when present. If another profile belonging to the same parent has the same label, `— Profile <slot>` is appended.
+- Same-name profiles are allowed. Create and update responses include a non-blocking `possibleDuplicate` result containing compact summaries of matching profiles owned by the same parent only.
+
+### 6.2 Capacity and lifecycle
+
+Each User may retain at most five StudentProfiles. The server assigns the lowest free slot from 1–5, and the unique `{ parentUser, slot }` index is the concurrency authority. Retained profiles continue to occupy their slots regardless of `isActive`; Phase B does not implement slot reuse, archival replacement, or deletion.
+
+### 6.3 Endpoints
+
+- `POST /api/students` — create a profile in the lowest available slot. Required body: `givenName`, `fatherName`, `grandfatherName`; optional: `grade`, `school`.
+- `GET /api/students` — list only the authenticated User's profiles in slot order.
+- `GET /api/students/:id` — get a profile only when both `_id` and authenticated parent ownership match.
+- `PATCH /api/students/:id` — update names, `grade`, `school`, or `isActive`; `parentUser`, `slot`, and `_id` cannot change.
+
+There is no StudentProfile `DELETE` endpoint in Phase B. StudentProfiles are not yet integrated with Enrollment, CompetitionRegistration, Certificates, teams, or migrations.
+
+---
+
+## 7. Summary of Other API Endpoints
 
 ### Auth Endpoints (`/api/auth`)
 - `POST /api/auth/register` - Student registration (body: `username`, `name`, `email`, `password`, `phone`)
@@ -422,7 +451,7 @@ The audit tool does not guess scope mappings or missing dates and does not make 
 
 ---
 
-## 7. Seed Data & Scripts
+## 8. Seed Data & Scripts
 
 - **Seed Courses**:
   ```bash

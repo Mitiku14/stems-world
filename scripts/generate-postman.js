@@ -29,6 +29,7 @@ const collection = {
     { key: 'certificate_id', value: '64a1b2c3d4e5f6789012abd4', type: 'string' },
     { key: 'certificate_number', value: 'CERT-2026-A1B2C3D4', type: 'string' },
     { key: 'student_id', value: '64a1b2c3d4e5f6789012abd5', type: 'string' },
+    { key: 'student_profile_id', value: '64a1b2c3d4e5f6789012abdd', type: 'string' },
     { key: 'phone_otp', value: '123456', type: 'string' }
   ],
   item: []
@@ -1254,6 +1255,70 @@ const contactFolder = {
   ]
 };
 
+// 12. Student Profiles
+const studentProfilesFolder = {
+  name: '12. Student Profiles',
+  description: 'Authenticated parent-owned StudentProfiles. Each User may retain at most five profiles. StudentProfile._id is authoritative; slot/profileNumber is presentation and capacity metadata only. Same-name profiles are allowed and may return a non-blocking possibleDuplicate warning.',
+  item: [
+    {
+      name: 'Create Student',
+      event: [makeTest(201)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'POST',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({
+            givenName: 'Abel',
+            fatherName: 'Bekele',
+            grandfatherName: 'Tesfaye',
+            grade: 'Grade 7',
+            school: 'School A'
+          }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/students', host: ['{{BASE_URL}}'], path: ['api', 'students'] }
+      }
+    },
+    {
+      name: 'List My Students',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/students', host: ['{{BASE_URL}}'], path: ['api', 'students'] }
+      }
+    },
+    {
+      name: 'Get Student',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'GET',
+        url: { raw: '{{BASE_URL}}/api/students/{{student_profile_id}}', host: ['{{BASE_URL}}'], path: ['api', 'students', '{{student_profile_id}}'] }
+      }
+    },
+    {
+      name: 'Update Student',
+      event: [makeTest(200)],
+      auth: bearerAuth('student_token'),
+      request: {
+        method: 'PATCH',
+        header: [{ key: 'Content-Type', value: 'application/json' }],
+        body: {
+          mode: 'raw',
+          raw: JSON.stringify({
+            grade: 'Grade 8',
+            school: 'School A',
+            isActive: true
+          }, null, 2)
+        },
+        url: { raw: '{{BASE_URL}}/api/students/{{student_profile_id}}', host: ['{{BASE_URL}}'], path: ['api', 'students', '{{student_profile_id}}'] }
+      }
+    }
+  ]
+};
+
 collection.item = [
   authFolder,
   coursesFolder,
@@ -1265,7 +1330,8 @@ collection.item = [
   certificatesFolder,
   adminCoreFolder,
   csvExportsFolder,
-  contactFolder
+  contactFolder,
+  studentProfilesFolder
 ];
 
 const environment = {
