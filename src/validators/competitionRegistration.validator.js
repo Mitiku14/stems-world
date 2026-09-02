@@ -33,6 +33,11 @@ const submitRegistrationRules = [
   
   body('teamMembers').optional().isArray().withMessage('Team members must be an array'),
   body('teamMembers.*').isString().trim().notEmpty(),
+
+  body('studentProfileId')
+    .optional()
+    .custom((v) => mongoose.Types.ObjectId.isValid(v))
+    .withMessage('studentProfileId must be a valid ID'),
 ];
 
 const registrationIdParam = [
@@ -62,10 +67,18 @@ const adminListQuery = [
   query('search').optional().isString().trim().isLength({ max: 100 }),
 ];
 
+const myListQuery = [
+  query('studentProfileId')
+    .optional()
+    .custom((v) => mongoose.Types.ObjectId.isValid(v))
+    .withMessage('studentProfileId must be a valid ID'),
+];
+
 module.exports = {
   submitRegistrationRules,
   registrationIdParam,
   rejectRegistrationRules,
   roundActionRules,
   adminListQuery,
+  myListQuery,
 };

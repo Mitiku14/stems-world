@@ -39,7 +39,13 @@ const competitionRegistrationSchema = new mongoose.Schema(
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      default: null, // For authenticated students
+      default: null, // For authenticated students (legacy)
+    },
+    // Phase C: parent-owned participant identity
+    studentProfile: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudentProfile',
+      default: null,
     },
     fullName: {
       type: String,
@@ -135,5 +141,18 @@ const competitionRegistrationSchema = new mongoose.Schema(
 competitionRegistrationSchema.index({ competition: 1, email: 1, status: 1 });
 competitionRegistrationSchema.index({ student: 1, competition: 1 });
 competitionRegistrationSchema.index({ status: 1, createdAt: -1 });
+
+// Phase C partial unique index for active StudentProfile competition registrations (pending or accepted)
+competitionRegistrationSchema.index(
+  { studentProfile: 1, competition: 1 },
+  {
+    name: 'competition_reg_active_unique',
+    unique: true,
+    partialFilterExpression: {
+      studentProfile: { $type: 'objectId' },
+      status: { $in: ['pending', 'accepted'] },
+    },
+  }
+);
 
 module.exports = mongoose.model('CompetitionRegistration', competitionRegistrationSchema);

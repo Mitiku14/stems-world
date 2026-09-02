@@ -10,6 +10,13 @@ const enrollmentSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Phase C: parent-owned enrollment identity
+    studentProfile: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StudentProfile',
+      default: null,
+    },
+
     // For anonymous enrollments: stored directly from form fields
     studentName: {
       type: String,
@@ -79,5 +86,18 @@ const enrollmentSchema = new mongoose.Schema(
 enrollmentSchema.index({ student: 1, course: 1, status: 1 });
 enrollmentSchema.index({ studentEmail: 1, course: 1, status: 1 });
 enrollmentSchema.index({ status: 1, createdAt: -1 });
+
+// Phase C partial unique index for active StudentProfile enrollments (pending or accepted)
+enrollmentSchema.index(
+  { studentProfile: 1, course: 1 },
+  {
+    name: 'enrollment_active_unique',
+    unique: true,
+    partialFilterExpression: {
+      studentProfile: { $type: 'objectId' },
+      status: { $in: ['pending', 'accepted'] },
+    },
+  }
+);
 
 module.exports = mongoose.model('Enrollment', enrollmentSchema);

@@ -15,6 +15,7 @@ const compCtrl = require('../src/controllers/competition.controller');
 const compRegCtrl = require('../src/controllers/competitionRegistration.controller');
 const exportController = require('../src/controllers/export.controller');
 const User = require('../src/models/User');
+const StudentProfile = require('../src/models/StudentProfile');
 const emailService = require('../src/services/email.service');
 const notificationService = require('../src/services/notification.service');
 const adminRoutes = require('../src/routes/admin.routes');
@@ -967,6 +968,7 @@ test('Concurrent registrations for the final slot serialize and roll back failed
   CompetitionRegistration.findOne = (filter) => ({
     session: async () => state.registrations.find((item) => (
       String(item.competition) === String(filter.competition)
+        && (!filter.studentProfile || String(item.studentProfile) === String(filter.studentProfile))
         && (!filter.student || String(item.student) === String(filter.student))
         && (!filter.email || item.email === filter.email)
         && ['pending', 'accepted'].includes(item.status)
@@ -984,7 +986,19 @@ test('Concurrent registrations for the final slot serialize and roll back failed
   emailService.sendCompetitionRegistrationSubmittedEmail = () => {};
   notificationService.createNotification = () => {};
 
-  const invoke = async (user, email) => {
+  const origFindProfile = StudentProfile.findOne;
+  StudentProfile.findOne = (query) => ({
+    lean: async () => ({
+      _id: query._id,
+      parentUser: query.parentUser,
+      givenName: 'Test',
+      fatherName: 'Student',
+      grandfatherName: 'User',
+      isActive: true,
+    }),
+  });
+
+  const invoke = async (user, email, existingProfileId = null) => {
     let body;
     let error;
     const res = {
@@ -992,12 +1006,13 @@ test('Concurrent registrations for the final slot serialize and roll back failed
       status(code) { this.statusCode = code; return this; },
       json(value) { body = value; return this; },
     };
+    const profileId = existingProfileId || new mongoose.Types.ObjectId();
     await compRegCtrl.submitRegistration({
       params: { id: competitionId.toString() },
-      body: { fullName: user.name, email },
+      body: { fullName: user.name, email, studentProfileId: profileId.toString() },
       user,
     }, res, (nextError) => { error = nextError; });
-    return { status: error?.statusCode || res.statusCode, error, body, user };
+    return { status: error?.statusCode || res.statusCode, error, body, user, profileId };
   };
 
   try {
@@ -1010,14 +1025,15 @@ test('Concurrent registrations for the final slot serialize and roll back failed
     assert.equal(state.registrations.length, 1);
     assert.equal(state.capacityVersion, 1);
 
-    const winner = results.find(({ status }) => status === 201).user;
-    const duplicate = await invoke(winner, winner.email);
+    const winnerResult = results.find(({ status }) => status === 201);
+    const winner = winnerResult.user;
+    const duplicate = await invoke(winner, winner.email, winnerResult.profileId);
     assert.equal(duplicate.status, 409);
     assert.equal(state.registrations.length, 1);
     assert.equal(state.capacityVersion, 1);
 
     state.registrations[0].status = 'rejected';
-    const reapplied = await invoke(winner, winner.email);
+    const reapplied = await invoke(winner, winner.email, winnerResult.profileId);
     assert.equal(reapplied.status, 201);
     assert.equal(state.registrations.length, 2);
     assert.equal(state.registrations.filter(({ status }) => ['pending', 'accepted'].includes(status)).length, 1);
@@ -1032,6 +1048,7 @@ test('Concurrent registrations for the final slot serialize and roll back failed
     User.exists = originals.userExists;
     emailService.sendCompetitionRegistrationSubmittedEmail = originals.email;
     notificationService.createNotification = originals.notification;
+    StudentProfile.findOne = origFindProfile;
   }
 });
 
@@ -1154,6 +1171,7 @@ test('admin and student registration responses expose Competition rounds for cur
   const originals = {
     find: CompetitionRegistration.find,
     countDocuments: CompetitionRegistration.countDocuments,
+    studentProfileFind: StudentProfile.find,
   };
   const roundIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
   const competition = {
@@ -1192,6 +1210,13 @@ test('admin and student registration responses expose Competition rounds for cur
   };
   CompetitionRegistration.find = findQuery;
   CompetitionRegistration.countDocuments = async () => 1;
+  StudentProfile.find = () => {
+    const chain = {
+      select() { return chain; },
+      lean: async () => [],
+    };
+    return chain;
+  };
 
   try {
     const adminResult = await invokeHandler(compRegCtrl.getAllRegistrations, {
@@ -1222,6 +1247,7 @@ test('admin and student registration responses expose Competition rounds for cur
   } finally {
     CompetitionRegistration.find = originals.find;
     CompetitionRegistration.countDocuments = originals.countDocuments;
+    StudentProfile.find = originals.studentProfileFind;
   }
 });
 
@@ -2335,6 +2361,19 @@ test('submitRegistration stores academicFile for authenticated individual and an
   notificationService.createNotification = () => {};
   notificationService.notifyUserByEmail = () => {};
 
+  const origFindProf31 = StudentProfile.findOne;
+  const profileId31 = new mongoose.Types.ObjectId();
+  StudentProfile.findOne = (query) => ({
+    lean: async () => ({
+      _id: profileId31,
+      parentUser: query.parentUser,
+      givenName: 'Authenticated',
+      fatherName: 'Applicant',
+      grandfatherName: 'User',
+      isActive: true,
+    }),
+  });
+
   const invokeRegistration = (body, user) => invokeHandler(compRegCtrl.submitRegistration, {
     params: { id: competitionId.toString() },
     body,
@@ -2343,13 +2382,13 @@ test('submitRegistration stores academicFile for authenticated individual and an
 
   try {
     const authenticated = await invokeRegistration(
-      { fullName: 'Ignored Name', email: 'ignored@example.com', academicFile },
+      { fullName: 'Ignored Name', email: 'ignored@example.com', academicFile, studentProfileId: profileId31.toString() },
       { _id: new mongoose.Types.ObjectId(), name: 'Authenticated Applicant', email: 'auth@example.com' }
     );
     assert.equal(authenticated.status, 201);
     assert.equal(captured[0].academicFile, academicFile);
     assert.equal(authenticated.body.data.academicFile, academicFile);
-    assert.ok(captured[0].student);
+    assert.ok(captured[0].studentProfile);
 
     competitionType = 'team';
     const anonymous = await invokeRegistration({
@@ -2375,6 +2414,7 @@ test('submitRegistration stores academicFile for authenticated individual and an
     emailService.sendCompetitionRegistrationSubmittedEmail = originals.email;
     notificationService.createNotification = originals.createNotification;
     notificationService.notifyUserByEmail = originals.notifyByEmail;
+    StudentProfile.findOne = origFindProf31;
   }
 });
 
@@ -2403,6 +2443,7 @@ test('authorized full registration responses and CSV export expose academicFile'
   const originals = {
     find: CompetitionRegistration.find,
     countDocuments: CompetitionRegistration.countDocuments,
+    studentProfileFind: StudentProfile.find,
   };
   const query = {
     populate() { return query; },
@@ -2413,6 +2454,13 @@ test('authorized full registration responses and CSV export expose academicFile'
   };
   CompetitionRegistration.find = () => query;
   CompetitionRegistration.countDocuments = async () => 1;
+  StudentProfile.find = () => {
+    const chain = {
+      select() { return chain; },
+      lean: async () => [],
+    };
+    return chain;
+  };
 
   try {
     const admin = await invokeHandler(compRegCtrl.getAllRegistrations, {
@@ -2445,6 +2493,7 @@ test('authorized full registration responses and CSV export expose academicFile'
   } finally {
     CompetitionRegistration.find = originals.find;
     CompetitionRegistration.countDocuments = originals.countDocuments;
+    StudentProfile.find = originals.studentProfileFind;
   }
 });
 

@@ -15,7 +15,8 @@ const { ROLES }            = require('../constants');
  *     summary: Submit a course enrollment
  *     description: >
  *       Submits an enrollment request for a course. **Authentication is optional.**
- *       If authenticated, the enrollment is linked to the user's account.
+ *       If authenticated with a studentProfileId, the enrollment is linked to the
+ *       selected child StudentProfile. Otherwise falls back to legacy behavior.
  *
  *       `courseType` can be:
  *       - A frontend ID like `"cs-1"`, `"math-3"`, `"english-1"`
@@ -57,6 +58,9 @@ const { ROLES }            = require('../constants');
  *                 type: string
  *                 example: 64a1b2c3...
  *                 description: ObjectId of the selected physical training site
+ *               studentProfileId:
+ *                 type: string
+ *                 description: ObjectId of a StudentProfile owned by the authenticated User. When supplied, the enrollment is linked to this child profile.
  *     responses:
  *       201:
  *         description: Enrollment submitted successfully
@@ -96,7 +100,11 @@ router.use(verifyToken, requireRole(ROLES.STUDENT, ROLES.ADMIN));
  * @swagger
  * /api/enrollments/my:
  *   get:
- *     summary: Get all enrollments for the current student
+ *     summary: Get enrollments for the current user's student profiles
+ *     description: >
+ *       Returns enrollments across all StudentProfiles owned by the authenticated User,
+ *       plus legacy enrollments linked directly. Optional studentProfileId filter limits
+ *       results to a specific owned profile.
  *     tags: [Enrollments]
  *     security:
  *       - BearerAuth: []
@@ -106,6 +114,10 @@ router.use(verifyToken, requireRole(ROLES.STUDENT, ROLES.ADMIN));
  *         schema:
  *           type: string
  *           enum: [pending, accepted, rejected]
+ *       - in: query
+ *         name: studentProfileId
+ *         schema: { type: string }
+ *         description: Optional. Filter to a specific StudentProfile owned by the authenticated User.
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:

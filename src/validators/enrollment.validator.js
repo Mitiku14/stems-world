@@ -6,6 +6,7 @@ const validStatuses = Object.values(ENROLLMENT_STATUS);
 
 // Anonymous enrollment — frontend sends: studentName, email, courseType (string), academicPdf (file)
 // courseType can be either a MongoDB ObjectId OR a frontendId string like "cs-1", "math-3"
+// Phase C: authenticated parents also send studentProfileId
 const submit = [
   body('studentName')
     .trim().notEmpty().withMessage('Student name is required')
@@ -32,6 +33,11 @@ const submit = [
   body('site')
     .optional({ nullable: true })
     .isMongoId().withMessage('Site must be a valid ID'),
+
+  body('studentProfileId')
+    .optional()
+    .custom((v) => mongoose.Types.ObjectId.isValid(v))
+    .withMessage('studentProfileId must be a valid ID'),
 ];
 
 const enrollmentIdParam = [
@@ -60,6 +66,11 @@ const myListQuery = [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('status').optional()
     .isIn(validStatuses).withMessage(`Status must be one of: ${validStatuses.join(', ')}`),
+  query('studentProfileId')
+    .optional()
+    .custom((v) => mongoose.Types.ObjectId.isValid(v))
+    .withMessage('studentProfileId must be a valid ID'),
 ];
 
 module.exports = { submit, enrollmentIdParam, reject, adminListQuery, myListQuery };
+

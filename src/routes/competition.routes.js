@@ -56,9 +56,18 @@ router.get('/', listQuery, validate, ctrl.getCompetitions);
  * /api/competitions/registrations/my:
  *   get:
  *     summary: Get my competition registrations and progression
+ *     description: >
+ *       Returns registrations across all StudentProfiles owned by the authenticated User,
+ *       plus legacy registrations linked directly. Optional studentProfileId filter limits
+ *       results to a specific owned profile.
  *     tags: [Competitions]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: studentProfileId
+ *         schema: { type: string }
+ *         description: Optional. Filter to a specific StudentProfile owned by the authenticated User.
  *     responses:
  *       200:
  *         description: Registrations fetched successfully
@@ -82,7 +91,7 @@ router.get('/', listQuery, validate, ctrl.getCompetitions);
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.get('/registrations/my', verifyToken, compRegCtrl.getMyRegistrations);
+router.get('/registrations/my', verifyToken, compRegValidator.myListQuery, validate, compRegCtrl.getMyRegistrations);
 
 /**
  * @swagger

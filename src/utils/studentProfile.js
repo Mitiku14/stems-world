@@ -96,6 +96,20 @@ const buildPossibleDuplicate = (profile, siblingProfiles = []) => {
   };
 };
 
+// Phase C: compact summary for embedding inside Enrollment / CompetitionRegistration responses
+const compactProfileSummary = (profile) => {
+  if (!profile) return null;
+  const plain = toPlainProfile(profile);
+  return {
+    _id: plain._id,
+    fullName: fullNameFor(plain),
+    displayLabel: baseDisplayLabelFor(plain),
+    profileNumber: plain.slot,
+    grade: plain.grade ?? null,
+    school: plain.school ?? null,
+  };
+};
+
 module.exports = {
   normalizeNameComponent,
   fullNameFor,
@@ -105,4 +119,5 @@ module.exports = {
   serializeStudentProfile,
   duplicateProfilesFor,
   buildPossibleDuplicate,
+  compactProfileSummary,
 };

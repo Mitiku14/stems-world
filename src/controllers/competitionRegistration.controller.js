@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const CompetitionRegistration = require('../models/CompetitionRegistration');
 const Competition = require('../models/Competition');
+const StudentProfile = require('../models/StudentProfile');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -9,6 +10,33 @@ const emailService = require('../services/email.service');
 const notificationService = require('../services/notification.service');
 const User = require('../models/User');
 const escapeRegex = require('../utils/escapeRegex');
+const { fullNameFor, compactProfileSummary } = require('../utils/studentProfile');
+
+// Active registration statuses that block duplicate registration
+const ACTIVE_REGISTRATION_STATUSES = [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED];
+
+/**
+ * Strict classifier for active competition registration duplicate index errors.
+ * Rejects duplicate _id errors, bare code 11000 errors, or unrelated unique index errors.
+ */
+function isCompetitionRegDuplicateError(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (error.code !== 11000 && error.code !== 11001) return false;
+
+  if (error.indexName === 'competition_reg_active_unique') return true;
+  if (typeof error.message === 'string' && error.message.includes('competition_reg_active_unique')) return true;
+
+  const keyPattern = error.keyPattern || {};
+  const hasProfileKey = Boolean(keyPattern.studentProfile);
+  const hasCompKey = Boolean(keyPattern.competition);
+  const keyCount = Object.keys(keyPattern).length;
+
+  if (hasProfileKey && hasCompKey && keyCount === 2) {
+    return true;
+  }
+
+  return false;
+}
 
 const paginate = (total, page, limit) => ({
   total,
@@ -64,7 +92,9 @@ const flattenRegistration = (r) => ({
   competitionId: r.competition?._id || r.competition,
   competitionTitle: r.competition?.title || '—',
   competition: flattenCompetition(r.competition),
-  studentName: r.student?.name || r.fullName || '—',
+  studentName: r.studentProfile
+    ? (typeof r.studentProfile === 'object' ? fullNameFor(r.studentProfile) : r.fullName)
+    : (r.student?.name || r.fullName || '—'),
   email: r.student?.email || r.email || '—',
   phone: r.phone,
   academicFile: r.academicFile || null,
@@ -81,13 +111,16 @@ const flattenRegistration = (r) => ({
   registeredAt: r.createdAt,
   rejectionReason: r.rejectionReason || null,
   reviewedAt: r.reviewedAt || null,
+  studentProfile: compactProfileSummary(
+    typeof r.studentProfile === 'object' ? r.studentProfile : null
+  ),
 });
 
 // ── Public / Student ───────────────────────────────────────────────────────
 
 exports.submitRegistration = asyncHandler(async (req, res) => {
   const compId = req.params.id;
-  const { fullName, email, phone, academicFile, grade, school, skills, motivation, teamName, teamMembers } = req.body;
+  const { fullName, email, phone, academicFile, grade, school, skills, motivation, teamName, teamMembers, studentProfileId } = req.body;
 
   const competition = await Competition.findOne({ _id: compId, isActive: true });
   if (!competition) throw new ApiError(404, 'Competition not found or no longer available.');
@@ -95,6 +128,121 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
   assertRegistrationAvailable(competition);
   assertRegistrationTypePayload(competition, teamName, teamMembers);
 
+  // ── Phase C: authenticated StudentProfile-based registration ──
+  if (req.user) {
+    if (!studentProfileId) {
+      throw new ApiError(400, 'studentProfileId is required for authenticated registrations.');
+    }
+    if (!mongoose.Types.ObjectId.isValid(studentProfileId)) {
+      throw new ApiError(422, 'Invalid student profile ID.');
+    }
+
+    const profile = await StudentProfile.findOne({
+      _id: studentProfileId,
+      parentUser: req.user._id,
+    }).lean();
+
+    if (!profile) throw new ApiError(404, 'Student profile not found.');
+    if (!profile.isActive) throw new ApiError(400, 'Student profile is not active.');
+
+    const participantName = fullNameFor(profile);
+
+    let registration;
+    try {
+      await mongoose.connection.transaction(async (session) => {
+        const lockedCompetition = await Competition.findOneAndUpdate(
+          { _id: competition._id, isActive: true, status: 'published' },
+          { $inc: { capacityVersion: 1 } },
+          { new: true, session }
+        );
+        if (!lockedCompetition) {
+          throw new ApiError(400, 'Registration is not open for this competition.');
+        }
+
+        assertRegistrationAvailable(lockedCompetition);
+        assertRegistrationTypePayload(lockedCompetition, teamName, teamMembers);
+
+        // Duplicate check: same StudentProfile + same Competition in active status
+        const duplicateFilter = {
+          studentProfile: profile._id,
+          competition: lockedCompetition._id,
+          status: { $in: ACTIVE_REGISTRATION_STATUSES },
+        };
+        const existing = await CompetitionRegistration.findOne(duplicateFilter).session(session);
+        if (existing) {
+          const msg = existing.status === ENROLLMENT_STATUS.PENDING
+            ? 'This student already has a pending registration.'
+            : 'This student is already registered.';
+          throw new ApiError(409, msg);
+        }
+
+        const maxCap = lockedCompetition.maxRegistrations ?? lockedCompetition.maxParticipants;
+        if (maxCap) {
+          const activeCount = await CompetitionRegistration.countDocuments({
+            competition: lockedCompetition._id,
+            status: { $in: ACTIVE_REGISTRATION_STATUSES },
+          }).session(session);
+          if (activeCount >= maxCap) {
+            throw new ApiError(400, 'This competition has reached max capacity.');
+          }
+        }
+
+        const created = await CompetitionRegistration.create([{
+          competition: lockedCompetition._id,
+          student: null,
+          studentProfile: profile._id,
+          fullName: participantName,
+          email: req.user.email || email,
+          phone: phone || null,
+          academicFile: academicFile || null,
+          grade: profile.grade || grade || null,
+          school: profile.school || school || null,
+          skills: skills || [],
+          motivation: motivation || null,
+          teamName: lockedCompetition.type === 'team' ? teamName.trim() : null,
+          teamMembers: lockedCompetition.type === 'team' ? teamMembers : [],
+          status: ENROLLMENT_STATUS.PENDING,
+          progressionStatus: 'not_started',
+          currentRound: null,
+          roundProgress: [],
+        }], { session });
+        [registration] = created;
+      });
+    } catch (error) {
+      if (isCompetitionRegDuplicateError(error)) {
+        throw new ApiError(409, 'This student is already registered for this competition.');
+      }
+      throw error;
+    }
+
+    if (emailService.sendCompetitionRegistrationSubmittedEmail && req.user.email) {
+      emailService.sendCompetitionRegistrationSubmittedEmail(
+        { name: participantName, email: req.user.email },
+        competition
+      );
+    }
+
+    notificationService.createNotification({
+      recipient: req.user._id,
+      title: 'Competition Registration Submitted',
+      message: `Registration for "${participantName}" in "${competition.title}" has been submitted.`,
+      type: 'competition_submitted',
+      relatedResource: registration._id,
+      relatedResourceType: 'CompetitionRegistration',
+    });
+
+    return res.status(201).json(
+      new ApiResponse(201, 'Registration submitted successfully.', {
+        id: registration._id,
+        studentProfile: compactProfileSummary(profile),
+        academicFile: registration.academicFile || null,
+        status: registration.status,
+        progressionStatus: registration.progressionStatus,
+      })
+    );
+  }
+
+  // ── Legacy path: anonymous or authenticated-without-profile ──
   if (!req.user && (await User.exists({ email }))) {
     throw new ApiError(409, 'An account already exists with this email. Please sign in to register.');
   }
@@ -104,7 +252,7 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
 
   const duplicateFilter = {
     competition: competition._id,
-    status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED] },
+    status: { $in: ACTIVE_REGISTRATION_STATUSES },
   };
   if (req.user) duplicateFilter.student = req.user._id;
   else duplicateFilter.email = regEmail;
@@ -112,9 +260,6 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
   let registration;
   try {
     await mongoose.connection.transaction(async (session) => {
-      // Every registration writes this Competition document first. Concurrent
-      // transactions for the same Competition therefore conflict and retry
-      // before counting capacity or checking duplicates.
       const lockedCompetition = await Competition.findOneAndUpdate(
         { _id: competition._id, isActive: true, status: 'published' },
         { $inc: { capacityVersion: 1 } },
@@ -140,7 +285,7 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
       if (maxCap) {
         const activeCount = await CompetitionRegistration.countDocuments({
           competition: lockedCompetition._id,
-          status: { $in: [ENROLLMENT_STATUS.PENDING, ENROLLMENT_STATUS.ACCEPTED] },
+          status: { $in: ACTIVE_REGISTRATION_STATUSES },
         }).session(session);
         if (activeCount >= maxCap) {
           throw new ApiError(400, 'This competition has reached max capacity.');
@@ -208,13 +353,42 @@ exports.submitRegistration = asyncHandler(async (req, res) => {
 });
 
 // Public / Student — get my registrations with progression
+// Phase C: returns registrations for all StudentProfiles owned by req.user, plus legacy
+// Optional query: studentProfileId — filter to a specific profile after ownership verification
 exports.getMyRegistrations = asyncHandler(async (req, res) => {
-  const filter = {
-    $or: [{ student: req.user._id }, { email: req.user.email }],
-  };
+  const { studentProfileId } = req.query;
+
+  let filter;
+
+  if (studentProfileId) {
+    if (!mongoose.Types.ObjectId.isValid(studentProfileId)) {
+      throw new ApiError(422, 'Invalid student profile ID.');
+    }
+    const profile = await StudentProfile.findOne({
+      _id: studentProfileId,
+      parentUser: req.user._id,
+    }).lean();
+    if (!profile) throw new ApiError(404, 'Student profile not found.');
+    filter = { studentProfile: profile._id };
+  } else {
+    // All registrations: legacy (student = user) + Phase C (studentProfile owned by user)
+    const ownedProfiles = await StudentProfile.find({ parentUser: req.user._id })
+      .select('_id')
+      .lean();
+    const profileIds = ownedProfiles.map((p) => p._id);
+
+    const orConditions = [
+      { student: req.user._id },
+    ];
+    if (profileIds.length > 0) {
+      orConditions.push({ studentProfile: { $in: profileIds } });
+    }
+    filter = { $or: orConditions };
+  }
 
   const registrations = await CompetitionRegistration.find(filter)
     .populate('competition', 'title category type scope eventStartDate status rounds')
+    .populate('studentProfile')
     .sort({ createdAt: -1 })
     .lean();
 
